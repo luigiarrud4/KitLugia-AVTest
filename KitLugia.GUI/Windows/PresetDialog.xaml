@@ -21,7 +21,7 @@
 
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
-            <TextBlock x:Name="PresetTitle" Text="Preset" FontSize="24" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
+            <TextBlock x:Name="PresetTitle" Text="Preset" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
             <TextBlock x:Name="PresetDescription" Text="Descri&#xE7;&#xE3;o" FontSize="14" Foreground="#CCC" Margin="0,5,0,0"/>
             <TextBlock Text="Selecione as otimiza&#xE7;&#xF5;es que deseja aplicar:" FontSize="12" Foreground="#888" Margin="0,10,0,0"/>
         </StackPanel>
@@ -67,7 +67,7 @@
             <Button Content="Aplicar Selecionados" 
                     Width="150" 
                     Height="35" 
-                    Background="{StaticResource AccentColor}" 
+                    Background="{DynamicResource AccentColor}" 
                     Foreground="White" 
                     BorderThickness="0"
                     Click="BtnApply_Click"/>

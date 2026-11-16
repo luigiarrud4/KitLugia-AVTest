@@ -552,66 +552,6 @@ namespace KitLugia.GUI.Pages
             string drive = _selectedPartition.DriveLetter;
             OverlayShrink.Visibility = Visibility.Collapsed;
 
-            // ─── NOVO FLUXO: shrink SEM WinPE ───────────────────────────────
-            // 1) Se o valor pedido couber no limite online, reduz direto (0 reboots).
-            // 2) Se não couber, oferece o shrink profundo (1 reboot, sem WinPE).
-            // 3) WinPE vira último recurso, só por escolha explícita.
-            try
-            {
-                UpdateStatus("Verificando limite de redução ONLINE...");
-                char letter = drive.FirstOrDefault();
-                var (onlineMaxMb, fitsOnline) = await Task.Run(
-                    () => OnlineShrinkManager.AnalyzeAsync(letter, shrinkMb),
-                    _cts?.Token ?? CancellationToken.None);
-
-                if (fitsOnline)
-                {
-                    ShowBusy($"REDUZINDO {drive.Replace(":", "").Trim()}: (SEM WINPE)",
-                        $"O valor pedido cabe no limite online ({onlineMaxMb} MB).\n" +
-                        $"Reduzindo agora — nenhum reboot é necessário...");
-                    long newSizeBytes = (long)_selectedPartition!.Size - shrinkMb * 1024L * 1024L;
-                    bool okOnline = await PartitionManager.ShrinkPartitionUsingStorageAPI(letter, newSizeBytes);
-                    ShowBusyResult(okOnline
-                        ? $"Volume {drive.Replace(":", "").Trim()}: reduzido em {shrinkMb} MB — sem reboot e sem WinPE."
-                        : $"Falha ao reduzir online. Detalhes no log.");
-                    return;
-                }
-
-                var choice = System.Windows.MessageBox.Show(
-                    $"O Windows só permite reduzir {onlineMaxMb} MB online " +
-                    $"(você pediu {shrinkMb} MB) — arquivos bloqueados (pagefile/hibernação/sombras) seguram o resto.\n\n" +
-                    $"Opções:\n" +
-                    $"• SIM — Shrink profundo SEM WinPE: libera pagefile/hibernação/sombras, " +
-                    $"reinicia 1× e reduz automaticamente no boot seguinte (estilo EaseUS).\n" +
-                    $"• NÃO — usar o WinPE (método antigo).\n" +
-                    $"• CANCELAR — nada acontece.",
-                    "Shrink além do limite online",
-                    System.Windows.MessageBoxButton.YesNoCancel, System.Windows.MessageBoxImage.Question);
-
-                if (choice == System.Windows.MessageBoxResult.Cancel) return;
-
-                if (choice == System.Windows.MessageBoxResult.Yes)
-                {
-                    ShowBusy("SHRINK PROFUNDO (SEM WINPE)",
-                        $"Alvo: {drive.Replace(":", "").Trim()}: | Reduzir: {shrinkMb} MB\n\n" +
-                        $"1. Desligando hibernação + sombras VSS + pagefile...\n" +
-                        $"2. O PC reiniciará em 10 segundos.\n" +
-                        $"3. No boot seguinte o Kit reduzirá o volume automaticamente e restaurará tudo.");
-
-                    var (okDeep, msgDeep) = await Task.Run(
-                        () => OnlineShrinkManager.PrepareDeepShrinkAsync(letter, shrinkMb),
-                        _cts?.Token ?? CancellationToken.None);
-                    ShowBusyResult(okDeep ? msgDeep : $"Falha: {msgDeep}");
-                    return;
-                }
-                // choice == No → segue para o fluxo WinPE original abaixo
-            }
-            catch (OperationCanceledException) { ShowBusyResult("Operação cancelada."); return; }
-            catch (Exception ex)
-            {
-                Logger.Log($"[SHRINK-ONLINE] Análise/online falhou ({ex.Message}); caindo para o fluxo WinPE.");
-            }
-
             const string osName = "WINPE";
             ShowBusy($"AGENDANDO SHRINK VIA {osName}",
                 $"Escrevendo configuracao e agendando reboot...\n\n" +

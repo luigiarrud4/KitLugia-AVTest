@@ -85,8 +85,8 @@ namespace KitLugia.GUI.Pages
         private void SetLoading(bool visible, string message = "")
         {
             if (LoadingOverlay == null) return;
-            if (!string.IsNullOrEmpty(message) && TxtLoadingMessage != null)
-                TxtLoadingMessage.Text = message;
+            if (!string.IsNullOrEmpty(message))
+                LoadingOverlay.Message = message;
             LoadingOverlay.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
 

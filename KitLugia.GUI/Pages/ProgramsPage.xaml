@@ -20,7 +20,7 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Style="{StaticResource PageTitleStyle}" Text="Gerenciador de Programas"/>
-                <TextBlock x:Name="ProgramCountText" Text="Programas: 0" FontSize="13" Foreground="#FFD700" Margin="15,8,0,0" FontWeight="SemiBold"/>
+                <TextBlock x:Name="ProgramCountText" Text="Programas: 0" FontSize="13" Foreground="{DynamicResource AccentColor}" Margin="15,8,0,0" FontWeight="SemiBold"/>
             </StackPanel>
             <TextBlock Text="Programas instalados no Windows. Gerencie instala&#xE7;&#xF5;es normais." Foreground="#AAA" Margin="0,5,0,0"/>
             <TextBlock Text="Baseado em Bulk Crap Uninstaller (BCU) - Licen&#xE7;a Apache 2.0" Foreground="#FF6F61" FontSize="11" Margin="0,5,0,0"/>
@@ -33,13 +33,7 @@
         </StackPanel>
 
         <!-- Loading Panel -->
-        <Border x:Name="LoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <!-- Variante A do contrato: Themes/Spinners.xaml -->
-                <ContentControl Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
-                <TextBlock Text="Carregando programas..." Foreground="White" Margin="0,15,0,0" FontSize="16"/>
-            </StackPanel>
-        </Border>
+        <controls:AreaLoadingOverlay x:Name="LoadingPanel" Grid.Row="1" Panel.ZIndex="99" Visibility="Visible" Message="Carregando programas..."/>
 
         <!-- Estado vazio (F4): cobre a lista quando o filtro nao devolve nada -->
         <controls:EmptyStateView x:Name="EmptyPrograms" Grid.Row="1" Panel.ZIndex="5"
@@ -48,7 +42,7 @@
                                  Hint="Ajuste a busca ou clique em Atualizar Lista."/>
 
         <!-- Programs List -->
-        <Border Grid.Row="1" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Padding="10">
+        <Border Grid.Row="1" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="10">
             <ListView x:Name="ProgramsList" 
                       Background="Transparent" 
                       BorderThickness="0"
@@ -110,7 +104,7 @@
                             <TextBlock Grid.Column="3" 
                                        Text="{Binding DisplayVersion}" 
                                        FontSize="11" 
-                                       Foreground="#555" 
+                                       Foreground="{DynamicResource BorderStrong}" 
                                        VerticalAlignment="Center" 
                                        TextTrimming="CharacterEllipsis"/>
 
@@ -152,10 +146,10 @@
                     Background="#8E44AD" Foreground="White" BorderThickness="0" Margin="0,0,10,0" Cursor="Hand"
                     ToolTip="Remove programa quebrado/sem uninstaller — deleta pasta + limpa registro"/>
             <Button Content="Remover Selecionados" Click="BtnRemoveSelected_Click" Height="35" Width="140" 
-                    Background="#C42B1C" Foreground="White" BorderThickness="0" Margin="0,0,10,0"
+                    Background="{DynamicResource ErrorBrush}" Foreground="White" BorderThickness="0" Margin="0,0,10,0"
                     Style="{StaticResource GoldButtonStyle}"/>
             <Button Content="Atualizar Lista" Click="BtnRefresh_Click" Height="35" Width="120" 
-                    Background="#333" Foreground="White" BorderThickness="0"
+                    Background="{DynamicResource BorderSubtle}" Foreground="White" BorderThickness="0"
                     Style="{StaticResource SecondaryButtonStyle}"/>
         </StackPanel>
     </Grid>

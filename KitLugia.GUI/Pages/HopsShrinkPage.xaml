@@ -1,0 +1,95 @@
+<Page x:Class="KitLugia.GUI.Pages.HopsShrinkPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="#E7E7E7" Foreground="#202020">
+    <Page.Resources>
+        <Style x:Key="BenchCard" TargetType="Border">
+            <Setter Property="Background" Value="#F7F7F7"/>
+            <Setter Property="BorderBrush" Value="#B8B8B8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+        <Style x:Key="BenchButton" TargetType="Button">
+            <Setter Property="Background" Value="#D5D5D5"/>
+            <Setter Property="Foreground" Value="#202020"/>
+            <Setter Property="BorderBrush" Value="#888888"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,7"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="MinHeight" Value="34"/>
+        </Style>
+    </Page.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24" MaxWidth="1200" HorizontalAlignment="Left">
+            <TextBlock Text="HOPS SHRINK — BANCADA DE TESTE" FontSize="24" FontWeight="Bold" Foreground="#222222"/>
+            <TextBlock Text="Mecanismos HOPS isolados para avaliação manual em máquinas virtuais. Selecione primeiro o disco e a partição alvo." FontSize="13" Foreground="#555555" TextWrapping="Wrap" Margin="0,5,0,16"/>
+
+            <Border Style="{StaticResource BenchCard}">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Margin="0,0,12,0">
+                        <TextBlock Text="DISCO FÍSICO" FontWeight="Bold" Foreground="#444444" Margin="0,0,0,5"/>
+                        <ComboBox x:Name="CmbDisk" DisplayMemberPath="DisplayName" SelectionChanged="CmbDisk_SelectionChanged" Height="34"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                        <TextBlock Text="PARTIÇÃO" FontWeight="Bold" Foreground="#444444" Margin="0,0,0,5"/>
+                        <ComboBox x:Name="CmbPartition" DisplayMemberPath="DisplayName" SelectionChanged="CmbPartition_SelectionChanged" Height="34"/>
+                    </StackPanel>
+                    <Button Grid.Column="2" Content="ATUALIZAR DISCOS" Click="Refresh_Click" Style="{StaticResource BenchButton}" VerticalAlignment="Bottom"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource BenchCard}">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="ALVO SELECIONADO" FontWeight="Bold" Foreground="#444444"/>
+                        <TextBlock x:Name="TxtTarget" Text="Selecione uma partição NTFS" Foreground="#333333" Margin="0,4,12,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                        <TextBlock Text="REDUZIR (MB)" FontWeight="Bold" Foreground="#444444"/>
+                        <TextBox x:Name="TxtShrinkMb" Text="1024" Width="120" Height="32" Padding="7,4"/>
+                    </StackPanel>
+                    <TextBlock x:Name="TxtLimit" Grid.Column="2" Text="Limite online: —" VerticalAlignment="Bottom" Foreground="#444444" Margin="0,0,0,6"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource BenchCard}">
+                <StackPanel>
+                    <TextBlock Text="MÉTODOS DE ANÁLISE E REDUÇÃO" FontSize="15" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <WrapPanel>
+                        <Button Content="ANALISAR EVENTO 259" Click="Diagnose_Click" Style="{StaticResource BenchButton}"/>
+                        <Button Content="SHRINK ONLINE" Click="OnlineShrink_Click" Style="{StaticResource BenchButton}"/>
+                        <Button Content="CASCATA HOPS" Click="Cascade_Click" Style="{StaticResource BenchButton}"/>
+                        <Button Content="DEFRAG /X + RETRIES" Click="Defrag_Click" Style="{StaticResource BenchButton}"/>
+                        <Button Content="MOVER $MFT::$BITMAP" Click="MoveMft_Click" Style="{StaticResource BenchButton}"/>
+                        <Button Content="NTFSRESIZE OFFLINE" Click="Offline_Click" Style="{StaticResource BenchButton}"/>
+                    </WrapPanel>
+                    <TextBlock Text="TRATAMENTOS INDIVIDUAIS" FontWeight="Bold" Foreground="#444444" Margin="0,8,0,6"/>
+                    <WrapPanel>
+                        <Button Content="HIBERNAÇÃO: DESLIGAR" Click="HibernateOff_Click" Style="{StaticResource BenchButton}"/>
+                        <Button Content="HIBERNAÇÃO: LIGAR" Click="HibernateOn_Click" Style="{StaticResource BenchButton}"/>
+                        <Button Content="APAGAR VSS" Click="DeleteVss_Click" Style="{StaticResource BenchButton}"/>
+                        <Button Content="REMOVER JOURNAL USN" Click="DeleteJournal_Click" Style="{StaticResource BenchButton}"/>
+                        <Button Content="RECRIAR JOURNAL USN" Click="CreateJournal_Click" Style="{StaticResource BenchButton}"/>
+                        <Button Content="PREPARAR PAGEFILE + REBOOT" Click="PreparePagefile_Click" Style="{StaticResource BenchButton}"/>
+                    </WrapPanel>
+                    <TextBlock Text="A cascata aplica hibernação, VSS, journal e defrag conforme o bloqueador. Pagefile tem preparação separada e exige reboot. Mover metadados NTFS e ntfsresize offline são ações de alto risco: use snapshot da VM." Foreground="#555555" FontSize="12" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource BenchCard}">
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <DockPanel Margin="0,0,0,8">
+                        <TextBlock Text="RESULTADOS / LOG" FontSize="15" FontWeight="Bold"/>
+                        <TextBlock x:Name="TxtStatus" Text="Pronto" Foreground="#555555" HorizontalAlignment="Right" DockPanel.Dock="Right"/>
+                    </DockPanel>
+                    <TextBox x:Name="TxtOutput" Grid.Row="1" MinHeight="240" MaxHeight="420" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" Background="#202020" Foreground="#E6E6E6" Padding="10"/>
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

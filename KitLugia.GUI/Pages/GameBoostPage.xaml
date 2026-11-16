@@ -9,87 +9,6 @@
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial"
       Loaded="GameBoostPage_Loaded">
 
-    <Page.Resources>
-        <ControlTemplate x:Key="GameBoostComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="36" />
-                </Grid.ColumnDefinitions>
-                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="5" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
-                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L5,5 L10,0" IsHitTestVisible="False"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Border" Property="Background" Value="#2A2A2A" />
-                    <Setter TargetName="Border" Property="BorderBrush" Value="#666666" />
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
-
-        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#222222"/>
-            <Setter Property="BorderBrush" Value="#444444"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Setter Property="OverridesDefaultStyle" Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ComboBox}">
-                        <Grid>
-                            <ToggleButton Name="ToggleButton" Template="{StaticResource GameBoostComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Cursor="Hand"/>
-                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
-                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide" StaysOpen="False">
-                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="#222222" BorderThickness="1" BorderBrush="#444444" CornerRadius="5"/>
-                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                    </ScrollViewer>
-                                </Grid>
-                            </Popup>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="#222"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="12,10"/>
-            <Setter Property="MinHeight" Value="36"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#333"/>
-                    <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
-                </Trigger>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#444"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        
-        <!-- Estilo do ToolTip (Balão de Informação) -->
-        <Style TargetType="ToolTip">
-            <Setter Property="Background" Value="#1A1A1A"/>
-            <Setter Property="Foreground" Value="#FFF"/>
-            <Setter Property="BorderBrush" Value="{StaticResource AccentColor}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="10"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="MaxWidth" Value="400"/>
-            <Setter Property="ContentTemplate">
-                <Setter.Value>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
-                    </DataTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Page.Resources>
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>  <!-- Header Fixo -->
@@ -99,7 +18,7 @@
         <!-- HEADER FIXO -->
         <StackPanel Grid.Row="0" Margin="30,20,30,0">
             <TextBlock Text="&#x1F680; GameBoost Pro" FontSize="32" FontWeight="Bold" 
-                       Foreground="{StaticResource AccentColor}" Margin="0,0,0,5">
+                       Foreground="{DynamicResource AccentColor}" Margin="0,0,0,5">
                 <TextBlock.Effect>
                     <DropShadowEffect Color="#FFD700" BlurRadius="10" ShadowDepth="0" Opacity="0.4"/>
                 </TextBlock.Effect>
@@ -199,7 +118,7 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsChecked" Value="True">
-                                                <Setter TargetName="border" Property="Background" Value="{StaticResource AccentColor}"/>
+                                                <Setter TargetName="border" Property="Background" Value="{DynamicResource AccentColor}"/>
                                                 <Setter TargetName="thumb" Property="HorizontalAlignment" Value="Right"/>
                                                 <Setter TargetName="thumb" Property="Margin" Value="0,0,2,0"/>
                                             </Trigger>
@@ -238,7 +157,7 @@
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="UNPARK CPU" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                         <TextBlock Text="Desparquear CPUs para menor lat&#xEA;ncia (via powercfg)" FontSize="11" Foreground="#888"/>
-                        <TextBlock Text="&#x26A1; Similar ao PowerSettingsExplorer" FontSize="11" Foreground="#FFD700" Margin="0,2,0,0"/>
+                        <TextBlock Text="&#x26A1; Similar ao PowerSettingsExplorer" FontSize="11" Foreground="{DynamicResource AccentColor}" Margin="0,2,0,0"/>
                     </StackPanel>
                     <ToggleButton x:Name="ChkUnparkCpu" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
                                   Checked="ChkUnparkCpu_Click" Unchecked="ChkUnparkCpu_Click"/>
@@ -252,7 +171,7 @@
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="TURBO EXPLORER AUTOM&#xC1;TICO (F11)" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
                         <TextBlock Text="Quando o explorer.exe reiniciar (login/crash), aplica o F11 re-render na 1&#xAA; pasta aberta" FontSize="11" Foreground="#888"/>
-                        <TextBlock Text="&#x1F4C1; 'Ir direto ao arquivo' instant&#xE2;neo ap&#xF3;s reboot — sem precisar apertar Ctrl+F11" FontSize="11" Foreground="#FFD700" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        <TextBlock Text="&#x1F4C1; 'Ir direto ao arquivo' instant&#xE2;neo ap&#xF3;s reboot — sem precisar apertar Ctrl+F11" FontSize="11" Foreground="{DynamicResource AccentColor}" Margin="0,2,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                     <ToggleButton x:Name="ChkExplorerAutoTurbo" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
                                   Checked="ChkExplorerAutoTurbo_Click" Unchecked="ChkExplorerAutoTurbo_Click"/>
@@ -310,8 +229,6 @@
                               IsHitTestVisible="True"
                               Focusable="True"
                               SelectionChanged="CmbEngine_SelectionChanged"
-                              Style="{StaticResource DarkComboBoxStyle}"
-                              ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
                               Cursor="Hand">
                         <ComboBoxItem Content="&#x1F916; Autom&#xE1;tico (RECOMENDADO)" Tag="5"/>
                         <ComboBoxItem Content="&#x1F7E2; V1 - Original Plus (legado)" Tag="1"/>
@@ -334,16 +251,16 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="&#x1F680; Desativar GameBarPresenceWriter.exe" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
-                        <TextBlock Text="&#x26A1; M&#xC9;TODO EFICAZ: Renomeia o arquivo para eliminar consumo de CPU/RAM em jogos" FontSize="11" Foreground="#FFD700" Margin="0,0,0,5"/>
+                        <TextBlock Text="&#x26A1; M&#xC9;TODO EFICAZ: Renomeia o arquivo para eliminar consumo de CPU/RAM em jogos" FontSize="11" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,5"/>
                         <TextBlock Text="GameBar continua funcionando normalmente. Apenas remove o processo de background que causa drops de FPS." FontSize="11" Foreground="#AAA" TextWrapping="Wrap"/>
                     </StackPanel>
                     <ToggleButton x:Name="ChkGameBarPresenceWriter" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
                                   Checked="ChkGameBarPresenceWriter_Click" Unchecked="ChkGameBarPresenceWriter_Click"/>
                 </Grid>
 
-                <Border Background="#1A1A1A" CornerRadius="5" Padding="15" Margin="0,10,0,0">
+                <Border Background="{DynamicResource Surface1}" CornerRadius="5" Padding="15" Margin="0,10,0,0">
                     <StackPanel>
-                        <TextBlock Text="&#x1F4CA; Benef&#xED;cios:" FontSize="12" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                        <TextBlock Text="&#x1F4CA; Benef&#xED;cios:" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8"/>
                         <TextBlock Text="&#x2022; Menos uso de CPU em background durante jogos" FontSize="11" Foreground="#CCC" Margin="0,0,0,4"/>
                         <TextBlock Text="&#x2022; Mais RAM dispon&#xED;vel para jogos" FontSize="11" Foreground="#CCC" Margin="0,0,0,4"/>
                         <TextBlock Text="&#x2022; FPS mais est&#xE1;veis (sem drops de 130&#x2192;30 FPS)" FontSize="11" Foreground="#CCC" Margin="0,0,0,4"/>
@@ -360,7 +277,7 @@
                     <ScrollViewer MaxHeight="420" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <TextBlock Text="&#x1F50D; Processos que a comunidade do Reddit costuma desativar"
-                                       FontSize="13" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                                       FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,6" TextWrapping="Wrap"/>
                             <TextBlock Text="Para quem curte otimizar o Windows ao extremo e remover processos em segundo plano sem quebrar o sistema, a comunidade do Reddit (especialmente em subreddits como r/Windows10, r/Windows11, r/pcmasterrace e comunidades de benchmarking/tweaking) debate bastante sobre quais .exe valem a pena mexer. Aqui est&#xE3;o os execut&#xE1;veis mais citados que as pessoas costumam desativar ou renomear para deixar o sistema mais leve:" FontSize="11" Foreground="#CCC" TextWrapping="Wrap" Margin="0,0,0,12"/>
 
                             <!-- 1. SmartScreen -->
@@ -368,7 +285,7 @@
                             <TextBlock Text="&#x2022; O que faz: analisa arquivos baixados da internet e execut&#xE1;veis para avisar se s&#xE3;o desconhecidos ou potencialmente perigosos." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
                             <TextBlock Text="&#x2022; Por que mexer: a cada programa ou instalador novo ele faz uma checagem de rede com servidores da Microsoft. Em PCs mais fracos, causa um atraso vis&#xED;vel (delay) de segundos ao abrir softwares ou jogos." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
                             <TextBlock Text="&#x2022; Impacto: o Windows abre execut&#xE1;veis instantaneamente." FontSize="11" Foreground="#BBB" Margin="0,0,0,3" TextWrapping="Wrap"/>
-                            <TextBlock Text="&#x26A0;&#xFE0F; Aviso de seguran&#xE7;a: voc&#xEA; perde o aviso autom&#xE1;tico sobre arquivos potencialmente maliciosos baixados do navegador." FontSize="11" Foreground="#FFD700" Margin="0,0,0,10" TextWrapping="Wrap"/>
+                            <TextBlock Text="&#x26A0;&#xFE0F; Aviso de seguran&#xE7;a: voc&#xEA; perde o aviso autom&#xE1;tico sobre arquivos potencialmente maliciosos baixados do navegador." FontSize="11" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,10" TextWrapping="Wrap"/>
 
                             <!-- 2. MicrosoftEdgeUpdate -->
                             <TextBlock Text="2. MicrosoftEdgeUpdate.exe (Servi&#xE7;o de Atualiza&#xE7;&#xE3;o do Edge)" FontSize="12" FontWeight="Bold" Foreground="White" Margin="0,0,0,4" TextWrapping="Wrap"/>
@@ -419,7 +336,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="&#x1F465; Otimiza&#xE7;&#xF5;es da Comunidade (Reddit)" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
-                        <TextBlock Text="&#x26A1; Desativa processos conhecidos sem renomear arquivos do System32 (via servi&#xE7;os, tarefas agendadas e registro)" FontSize="11" Foreground="#FFD700" Margin="0,0,0,5" TextWrapping="Wrap"/>
+                        <TextBlock Text="&#x26A1; Desativa processos conhecidos sem renomear arquivos do System32 (via servi&#xE7;os, tarefas agendadas e registro)" FontSize="11" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,5" TextWrapping="Wrap"/>
                         <TextBlock Text="M&#xE9;todo recomendado pela comunidade: sobrevive a Windows Update sem quebrar o sistema." FontSize="11" Foreground="#AAA" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Grid>
@@ -506,14 +423,14 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="&#x1F4E5; Download Boost (Autom&#xE1;tico)" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
-                        <TextBlock Text="&#x1F4A1; Detecta downloads em tempo real e otimiza a rede para m&#xE1;xima velocidade (BBR2, RSS, RSC)" FontSize="11" Foreground="#FFD700" Margin="0,0,0,5"/>
+                        <TextBlock Text="&#x1F4A1; Detecta downloads em tempo real e otimiza a rede para m&#xE1;xima velocidade (BBR2, RSS, RSC)" FontSize="11" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,5"/>
                         <TextBlock Text="Monitora conex&#xF5;es TCP por processo. Quando um app baixa &gt;5MB/s, aplica TCP tuning autom&#xE1;tico. Reverte quando o download termina." FontSize="11" Foreground="#AAA" TextWrapping="Wrap"/>
                     </StackPanel>
                     <ToggleButton x:Name="TglDownloadBoost" Grid.Column="1" Style="{StaticResource GoldToggleStyle}"
                                   Checked="TglDownloadBoost_Checked" Unchecked="TglDownloadBoost_Checked"/>
                 </Grid>
 
-                <Border Background="#1A1A1A" CornerRadius="5" Padding="15" Margin="0,10,0,0" x:Name="PanelDownloadBoostOptions">
+                <Border Background="{DynamicResource Surface1}" CornerRadius="5" Padding="15" Margin="0,10,0,0" x:Name="PanelDownloadBoostOptions">
                     <StackPanel>
                         <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
@@ -522,7 +439,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Modo:" FontSize="12" Foreground="#CCC" VerticalAlignment="Center"/>
                             <ComboBox Grid.Column="1" x:Name="CboDownloadBoostMode" SelectedIndex="0"
-                                      Background="#2d2d2d" Foreground="White" BorderBrush="#555"
+                                      Background="#2d2d2d" Foreground="White" BorderBrush="{DynamicResource BorderStrong}"
                                       MinWidth="140" Height="28" FontSize="12"
                                       SelectionChanged="CboDownloadBoostMode_Changed">
                                 <ComboBoxItem Content="Autom&#xE1;tico (detecta sozinho)"/>
@@ -538,7 +455,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Threshold (MB/s) para ativar:" FontSize="12" Foreground="#CCC" VerticalAlignment="Center"/>
                             <TextBox Grid.Column="1" x:Name="TxtDownloadBoostThreshold" Text="5"
-                                     Background="#2d2d2d" Foreground="White" BorderBrush="#555"
+                                     Background="#2d2d2d" Foreground="White" BorderBrush="{DynamicResource BorderStrong}"
                                      Height="28" FontSize="12" Padding="6,0"
                                      LostFocus="TxtDownloadBoostThreshold_LostFocus"/>
                         </Grid>
@@ -572,7 +489,7 @@
                 <Border Grid.Column="0" Style="{StaticResource CompactCardStyle}" Padding="20" Margin="0,0,10,0">
                     <StackPanel>
                         <TextBlock Text="&#x1F53A;" FontSize="24" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                        <TextBlock Text="Foreground Boost" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}"
+                        <TextBlock Text="Foreground Boost" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"
                                    TextAlignment="Center" Margin="0,0,0,5"/>
                         <TextBlock Text="App ativo recebe prioridade High automaticamente" FontSize="11" Foreground="#888"
                                    TextAlignment="Center" TextWrapping="Wrap"/>
@@ -615,7 +532,7 @@
                             <TextBlock Text="Detec&#xE7;&#xE3;o autom&#xE1;tica de foreground e otimiza&#xE7;&#xE3;o" FontSize="12" Foreground="#888"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock x:Name="StatusText" Text="MONITORANDO" FontSize="11" FontWeight="SemiBold" Foreground="#4CAF50"/>
+                            <TextBlock x:Name="StatusText" Text="MONITORANDO" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SuccessBrush}"/>
                         </StackPanel>
                     </Grid>
 
@@ -629,7 +546,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="&#x2705;" FontSize="16" Margin="0,0,10,0"/>
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Detec&#xE7;&#xE3;o Foreground" FontWeight="SemiBold" Foreground="#4CAF50" FontSize="12"/>
+                                    <TextBlock Text="Detec&#xE7;&#xE3;o Foreground" FontWeight="SemiBold" Foreground="{DynamicResource SuccessBrush}" FontSize="12"/>
                                     <TextBlock Text="Kernel Hook - Instant&#xE2;neo e sem lag" FontSize="11" Foreground="#888"/>
                                 </StackPanel>
                             </Grid>
@@ -640,7 +557,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="&#x2705;" FontSize="16" Margin="0,0,10,0"/>
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Otimiza&#xE7;&#xE3;o Autom&#xE1;tica" FontWeight="SemiBold" Foreground="#4CAF50" FontSize="12"/>
+                                    <TextBlock Text="Otimiza&#xE7;&#xE3;o Autom&#xE1;tica" FontWeight="SemiBold" Foreground="{DynamicResource SuccessBrush}" FontSize="12"/>
                                     <TextBlock Text="Boost aplicado ao processo em foreground" FontSize="11" Foreground="#888"/>
                                 </StackPanel>
                             </Grid>
@@ -651,7 +568,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="&#x2705;" FontSize="16" Margin="0,0,10,0"/>
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Revers&#xE3;o Autom&#xE1;tica" FontWeight="SemiBold" Foreground="#4CAF50" FontSize="12"/>
+                                    <TextBlock Text="Revers&#xE3;o Autom&#xE1;tica" FontWeight="SemiBold" Foreground="{DynamicResource SuccessBrush}" FontSize="12"/>
                                     <TextBlock Text="Prioridades restauradas ao sair do foreground" FontSize="11" Foreground="#888"/>
                                 </StackPanel>
                             </Grid>
@@ -672,7 +589,7 @@
                                     <Button.ToolTip>
                                         <ToolTip Content="Adiciona ao motor autom&#xE1;tico o boost tempor&#xE1;rio de prioridade do processo ativo: enquanto o app estiver em foreground ele roda mais r&#xE1;pido (prioridade mais alta) e ao perder o foco a prioridade volta ao normal automaticamente. O perfil personalizado define o n&#xED;vel exato (1-20)."/>
                                     </Button.ToolTip>
-                                    <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                    <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                                     
                                 </Button>
                                 <TextBlock Text="&#x1F53A; BOOST DO APP ATIVO" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
@@ -699,7 +616,7 @@
                     <StackPanel>
                         <Grid Margin="0,0,0,5">
                             <TextBlock x:Name="TxtTotalBoosted" Text="0" FontSize="24" FontWeight="Bold"
-                                       Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
+                                       Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center"/>
                             <Border Background="#DDFF9800" CornerRadius="6" Padding="8,4" HorizontalAlignment="Right" VerticalAlignment="Top"
                                     Margin="0,-8,0,0">
                                 <TextBlock Text="Em Desenvolvimento" FontSize="11" FontWeight="SemiBold" Foreground="White"/>
@@ -766,7 +683,7 @@
                         <!-- Nome do Perfil -->
                         <TextBlock Text="Nome do Perfil:" Foreground="#DDD" Margin="0,0,0,5"/>
                         <TextBox x:Name="TxtCustomProfileName" Text="Meu Motor Personalizado" 
-                                 Background="#2D2D2D" Foreground="White" BorderBrush="#555" 
+                                 Background="#2D2D2D" Foreground="White" BorderBrush="{DynamicResource BorderStrong}" 
                                  Padding="10" Height="42" FontSize="13" Margin="0,0,0,15"/>
                         
                         <!-- CPU Priority -->
@@ -774,7 +691,7 @@
                         <TextBlock Text="Define a prioridade de processamento para o jogo em primeiro plano" 
                                    FontSize="11" Foreground="#888" Margin="0,0,0,5"/>
                         <ComboBox x:Name="CmbCpuPriority" SelectedIndex="1" Height="42" FontSize="13"
-                                  Style="{StaticResource DarkComboBoxStyle}" Margin="0,0,0,15">
+                                  Margin="0,0,0,15">
                             <ComboBoxItem Content="Normal (Padr&#xE3;o do Windows)" Background="#2D2D2D" Foreground="White"/>
                             <ComboBoxItem Content="High (Recomendado para games)" Background="#2D2D2D" Foreground="White"/>
                             <ComboBoxItem Content="RealTime (M&#xE1;xima prioridade - CUIDADO)" Background="#2D2D2D" Foreground="White"/>
@@ -785,7 +702,7 @@
                         <TextBlock Text="Controla a velocidade de acesso ao disco/SSD" 
                                    FontSize="11" Foreground="#888" Margin="0,0,0,5"/>
                         <ComboBox x:Name="CmbIoPriority" SelectedIndex="1" Height="42" FontSize="13"
-                                  Style="{StaticResource DarkComboBoxStyle}" Margin="0,0,0,15">
+                                  Margin="0,0,0,15">
                             <ComboBoxItem Content="Normal (Prioridade padr&#xE3;o)" Background="#2D2D2D" Foreground="White"/>
                             <ComboBoxItem Content="High (Prioridade alta para carregamentos)" Background="#2D2D2D" Foreground="White"/>
                             <ComboBoxItem Content="Critical (M&#xE1;xima - use com cautela)" Background="#2D2D2D" Foreground="White"/>
@@ -796,7 +713,7 @@
                         <TextBlock Text="Escala oficial: 1=Very Low, 2=Low, 3=Medium, 4=Below Normal, 5=Normal (PADR&#xE3;O). N&#xE3;o existe &quot;Maximum&quot; — 5 j&#xE1; &#xE9; o m&#xE1;ximo e o default do Windows."
                                    FontSize="11" Foreground="#888" Margin="0,0,0,5" TextWrapping="Wrap"/>
                         <ComboBox x:Name="CmbPagePriority" SelectedIndex="0" Height="42" FontSize="13"
-                                  Style="{StaticResource DarkComboBoxStyle}" Margin="0,0,0,15">
+                                  Margin="0,0,0,15">
                             <ComboBoxItem Content="Normal (5) — Padr&#xE3;o do Windows" Background="#2D2D2D" Foreground="White"/>
                             <ComboBoxItem Content="Below Normal (4) — trimma antes" Background="#2D2D2D" Foreground="White"/>
                         </ComboBox>
@@ -806,7 +723,7 @@
                         <TextBlock Text="Mesma escala 1..5. Normal (5) evita page fault storm; Very Low (1) faz o SO trimar este processo primeiro."
                                    FontSize="11" Foreground="#888" Margin="0,0,0,5" TextWrapping="Wrap"/>
                         <ComboBox x:Name="CmbThreadMemory" SelectedIndex="0" Height="42" FontSize="13"
-                                  Style="{StaticResource DarkComboBoxStyle}" Margin="0,0,0,15">
+                                  Margin="0,0,0,15">
                             <ComboBoxItem Content="Normal (5) — Balanceado" Background="#2D2D2D" Foreground="White"/>
                             <ComboBoxItem Content="Very Low (1) — trimma primeiro" Background="#2D2D2D" Foreground="White"/>
                         </ComboBox>
@@ -840,7 +757,7 @@
                                                     <Button.ToolTip>
                                                         <ToolTip Content="Ajusta a resolu&#xE7;&#xE3;o do timer do Windows para 1ms via ntdll. Reduz lat&#xEA;ncia de entrada, melhora responsividade em jogos e reduz stutter. Pode aumentar consumo de CPU em idle. AVISO: Pode causar estouros/popping em &#xE1;udio virtual (Voicemeeter, VB-Cable, etc.). Se usar &#xE1;udio virtual, deixe esta op&#xE7;&#xE3;o desligada."/>
                                                     </Button.ToolTip>
-                                                    <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                                    <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                                                     
                                                 </Button>
                                                 <TextBlock Text="&#x23F1;&#xFE0F; Timer Resolution" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
@@ -881,7 +798,7 @@
                                                 <Button.ToolTip>
                                                     <ToolTip Content="Remove o limitador EcoQoS (Energy Efficiency) das threads do processo. Em CPUs h&#xED;bridas, impede que threads do jogo sejam movidas para E-cores por economia de energia. Essencial para performance m&#xE1;xima em notebooks."/>
                                                 </Button.ToolTip>
-                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                                                 
                                             </Button>
                                             <TextBlock Text="&#x1F331; EcoQoS" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
@@ -912,7 +829,7 @@
                                                 <Button.ToolTip>
                                                     <ToolTip Content="Aumenta a prioridade de pacotes de rede do processo via Process Priority Class. Melhora lat&#xEA;ncia em jogos online, reduzindo ping e packet loss em redes congestionadas."/>
                                                 </Button.ToolTip>
-                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                                                 
                                             </Button>
                                             <TextBlock Text="&#x1F310; Acelera&#xE7;&#xE3;o de Rede" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
@@ -943,7 +860,7 @@
                                                 <Button.ToolTip>
                                                     <ToolTip Content="Algoritmo ProBalance (estilo Process Lasso): reduz dinamicamente a prioridade de threads de processos em background que est&#xE3;o consumindo mais CPU que o limite definido. Garante mais recursos para o jogo em primeiro plano."/>
                                                 </Button.ToolTip>
-                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                                                 
                                             </Button>
                                             <TextBlock Text="&#x2696;&#xFE0F; ProBalance" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
@@ -974,7 +891,7 @@
                                                 <Button.ToolTip>
                                                     <ToolTip Content="Usa a API SetThreadEfficiencyMode (Windows 11 24H2+) para marcar threads do jogo com efici&#xEA;ncia desligada. For&#xE7;a execu&#xE7;&#xE3;o apenas nos P-cores (performance), impedindo que sejam movidas para E-cores. Reduz micro-travamentos em CPUs h&#xED;bridas Intel 12&#xAA; gen+ e AMD Ryzen. Sem efeito em CPUs sem h&#xED;brida."/>
                                                 </Button.ToolTip>
-                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                                                 
                                             </Button>
                                             <TextBlock Text="&#x1F5A5;&#xFE0F; Apenas P-Cores" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
@@ -1005,7 +922,7 @@
                                                 <Button.ToolTip>
                                                     <ToolTip Content="Usa a API GameClassInfo do Windows para sinalizar ao sistema operacional que este processo &#xE9; um jogo. Ativa otimiza&#xE7;&#xF5;es autom&#xE1;ticas do Game Mode: prioridade de GPU, desativa&#xE7;&#xE3;o de notifica&#xE7;&#xF5;es, atualiza&#xE7;&#xF5;es do Windows em segundo plano, e aloca&#xE7;&#xE3;o preferencial de recursos."/>
                                                 </Button.ToolTip>
-                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                                                 
                                             </Button>
                                             <TextBlock Text="&#x1F3AE; API Game Mode" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
@@ -1036,7 +953,7 @@
                                                 <Button.ToolTip>
                                                     <ToolTip Content="Altera o Win32PrioritySeparation no registro (valor 0x26) para configurar o scheduler do Windows com quantum curto e prioridade m&#xE1;xima para foreground. O agendador favorece o programa ativo, dando mais fatias de CPU ao jogo e reduzindo lat&#xEA;ncia de altern&#xE2;ncia de contexto. Efeito global no sistema at&#xE9; reinicializar."/>
                                                 </Button.ToolTip>
-                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                                <TextBlock Text="&#x2139;&#xFE0F;" FontSize="12" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                                                 
                                             </Button>
                                             <TextBlock Text="&#x26A1; Acelera&#xE7;&#xE3;o do Agendador" FontWeight="SemiBold" FontSize="13" Foreground="White"/>

@@ -95,7 +95,7 @@
                                FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"
                                HorizontalAlignment="Center"/>
                     <TextBlock x:Name="TxtReinstallLabel" Text=""
-                               FontSize="10" Foreground="#FFD700" HorizontalAlignment="Center"/>
+                               FontSize="10" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
 
@@ -118,7 +118,7 @@
                         <GradientStop Color="#FFA500" Offset="1"/>
                     </LinearGradientBrush>
                 </Button.Background>
-                <TextBlock x:Name="TxtOkBtn" Text="ENTENDIDO" FontWeight="Bold" FontSize="12" Foreground="#1A1A1A" HorizontalAlignment="Center"/>
+                <TextBlock x:Name="TxtOkBtn" Text="ENTENDIDO" FontWeight="Bold" FontSize="12" Foreground="{DynamicResource Surface1}" HorizontalAlignment="Center"/>
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="5"

@@ -8,51 +8,6 @@
       d:DesignHeight="700" d:DesignWidth="1000"
       Title="Winboot">
 
-    <Page.Resources>
-        <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="30" />
-                </Grid.ColumnDefinitions>
-                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
-                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L4,4 L8,0" IsHitTestVisible="False"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Border" Property="Background" Value="#333333" />
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
-
-        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#1A1A1A"/>
-            <Setter Property="BorderBrush" Value="#444444"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Setter Property="OverridesDefaultStyle" Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ComboBox}">
-                        <Grid>
-                            <ToggleButton Name="ToggleButton" Template="{StaticResource ComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
-                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
-                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="#1A1A1A" BorderThickness="1" BorderBrush="#444444"/>
-                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                    </ScrollViewer>
-                                </Grid>
-                            </Popup>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Page.Resources>
-
     <Grid Margin="30">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -64,19 +19,19 @@
         <StackPanel Orientation="Horizontal" Margin="0,0,0,30">
             <TextBlock Text="🚀" FontSize="32" Margin="0,0,15,0" VerticalAlignment="Center"/>
             <StackPanel>
-                <TextBlock Text="WINBOOT (NO-USB)" FontSize="26" FontWeight="ExtraBold" Foreground="{StaticResource AccentColor}"/>
-                <TextBlock Text="Instalação Local Independente de Mídia" FontSize="12" Foreground="{StaticResource TextMuted}" Opacity="0.8"/>
+                <TextBlock Text="WINBOOT (NO-USB)" FontSize="26" FontWeight="ExtraBold" Foreground="{DynamicResource AccentColor}"/>
+                <TextBlock Text="Instalação Local Independente de Mídia" FontSize="12" Foreground="{DynamicResource TextMuted}" Opacity="0.8"/>
             </StackPanel>
         </StackPanel>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
             <StackPanel>
                 <!-- Disk Selection Card -->
-                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
                     <StackPanel>
-                        <TextBlock Text="💾 DISCO E PARTIÇÃO" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
+                        <TextBlock Text="💾 DISCO E PARTIÇÃO" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,15"/>
 
-                        <TextBlock Text="Selecione o disco físico:" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+                        <TextBlock Text="Selecione o disco físico:" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,5"/>
                         <Grid Margin="0,0,0,15">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -84,8 +39,7 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- COMBOBOX DISCOS CORRIGIDO -->
-                            <ComboBox x:Name="ComboDisks" Height="40" 
-                                      Style="{StaticResource DarkComboBoxStyle}"
+                            <ComboBox x:Name="ComboDisks" Height="40"
                                       SelectionChanged="ComboDisks_SelectionChanged">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
@@ -97,11 +51,10 @@
                             <Button Grid.Column="1" Content="🔄" Width="45" Margin="10,0,0,0" Click="BtnRefresh_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                         </Grid>
 
-                        <TextBlock Text="Selecione a partição para reduzir (serão retirados 8GB):" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+                        <TextBlock Text="Selecione a partição para reduzir (serão retirados 8GB):" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,5"/>
 
                         <!-- COMBOBOX PARTIÇÕES CORRIGIDO -->
-                        <ComboBox x:Name="ComboPartitions" Height="40" 
-                                  Style="{StaticResource DarkComboBoxStyle}">
+                        <ComboBox x:Name="ComboPartitions" Height="40">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding DisplayName}" Foreground="White" Padding="5"/>
@@ -110,27 +63,27 @@
                         </ComboBox>
 
                         <TextBlock Text="⚠️ Nota: Partições menores que 8GB ou reservadas pelo sistema estão ocultas." 
-                                   FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,10,0,0"/>
+                                   FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,10,0,0"/>
 
                     </StackPanel>
                 </Border>
 
                 <!-- ISO Selection Card -->
-                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+                <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
                     <StackPanel>
-                        <TextBlock Text="💿 IMAGEM ISO" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
-                        <TextBlock Text="Selecione o arquivo ISO de instalação:" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+                        <TextBlock Text="💿 IMAGEM ISO" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,15"/>
+                        <TextBlock Text="Selecione o arquivo ISO de instalação:" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,5"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBox x:Name="TxtIsoPath" Height="40" VerticalContentAlignment="Center"
-                                     Background="#1A1A1A" Foreground="#FFFFFF" BorderThickness="1" BorderBrush="#444444" Padding="15,0" IsReadOnly="True"
+                                     Background="{DynamicResource Surface1}" Foreground="#FFFFFF" BorderThickness="1" BorderBrush="#444444" Padding="15,0" IsReadOnly="True"
                                      TextChanged="TxtIsoPath_TextChanged"/>
                             <Button Grid.Column="1" Content="BUSCAR ISO" Padding="20,0" Margin="10,0,0,0" Click="BtnBrowseIso_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                         </Grid>
-                        <TextBlock x:Name="TxtDetectedIsoType" Text="" FontSize="11" Foreground="{StaticResource AccentColor}" Margin="0,5,0,0" FontWeight="Bold"/>
+                        <TextBlock x:Name="TxtDetectedIsoType" Text="" FontSize="11" Foreground="{DynamicResource AccentColor}" Margin="0,5,0,0" FontWeight="Bold"/>
 
                         <!-- Botão para gerar autounattend.xml -->
                         <Button x:Name="BtnGenerateAutounattend" Content="📝 CRIAR ARQUIVO AUTOUNATTEND.XML" Margin="0,15,0,0" Height="40" Click="BtnGenerateAutounattend_Click" Style="{StaticResource GoldButtonStyle}"/>
@@ -149,16 +102,16 @@
                         <StackPanel x:Name="PanelIsoQuickActions" Visibility="Collapsed" Margin="0,12,0,0">
                             <Border Background="#1A1A2E" BorderBrush="#2A2A4F" BorderThickness="1" CornerRadius="10" Padding="10">
                                 <StackPanel>
-                                    <TextBlock Text="⚡ CONTROLE DIRETO DA ISO" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,3"/>
-                                    <TextBlock Text="Ajuste rápido: idioma, usuário e bypass. Clique EDITAR para abrir o XML completo." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                    <TextBlock Text="⚡ CONTROLE DIRETO DA ISO" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,3"/>
+                                    <TextBlock Text="Ajuste rápido: idioma, usuário e bypass. Clique EDITAR para abrir o XML completo." FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                     <Grid Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Margin="0,0,4,0">
-                                            <TextBlock Text="Idioma rápido:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
-                                            <ComboBox x:Name="CmbQuickLanguage" Height="32" Style="{StaticResource DarkComboBoxStyle}" SelectionChanged="CmbQuickLanguage_SelectionChanged">
+                                            <TextBlock Text="Idioma rápido:" Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
+                                            <ComboBox x:Name="CmbQuickLanguage" Height="32" SelectionChanged="CmbQuickLanguage_SelectionChanged">
                                                 <ComboBoxItem Content="Português (Brasil) — pt-BR" Tag="pt-BR" IsSelected="True"/>
                                                 <ComboBoxItem Content="English (United States) — en-US" Tag="en-US"/>
                                                 <ComboBoxItem Content="Español (España) — es-ES" Tag="es-ES"/>
@@ -174,15 +127,15 @@
                                             </ComboBox>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Margin="5,0,0,0">
-                                            <TextBlock Text="Usuário rápido:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
+                                            <TextBlock Text="Usuário rápido:" Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                             <TextBox x:Name="TxtQuickUser" Text="Usuário" Style="{StaticResource DarkTextBoxStyle}" Height="32" VerticalContentAlignment="Center"/>
                                         </StackPanel>
                                     </Grid>
-                                    <TextBlock Text="Funções rápidas:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Funções rápidas:" Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,0,0,4"/>
                                     <WrapPanel Margin="0,0,0,6">
                                         <CheckBox x:Name="ChkQuickBypass" Content="Bypass TPM" Foreground="White" Margin="0,0,10,4" IsChecked="True" FontSize="11"/>
                                         <CheckBox x:Name="ChkQuickLocal" Content="Conta Local" Foreground="White" Margin="0,0,10,4" IsChecked="True" FontSize="11"/>
-                                        <CheckBox x:Name="ChkQuickAuto" Content="Auto" Foreground="{StaticResource AccentColor}" Margin="0,0,10,4" IsChecked="True" FontSize="11"/>
+                                        <CheckBox x:Name="ChkQuickAuto" Content="Auto" Foreground="{DynamicResource AccentColor}" Margin="0,0,10,4" IsChecked="True" FontSize="11"/>
                                         <CheckBox x:Name="ChkQuickPrivacy" Content="Sem Telemetria" Foreground="White" Margin="0,0,10,4" IsChecked="True" FontSize="11"/>
                                         <CheckBox x:Name="ChkQuickDefender" Content="Sem Defender" Foreground="White" Margin="0,0,10,4" IsChecked="False" FontSize="11"/>
                                         <CheckBox x:Name="ChkQuickCopilot" Content="Sem Copilot" Foreground="White" Margin="0,0,10,4" IsChecked="True" FontSize="11"/>
@@ -198,7 +151,7 @@
                                         <Button x:Name="BtnQuickEdit" Content="📝 XAML PURO" Height="32" Margin="0,0,5,0" Click="BtnQuickEdit_Click" Style="{StaticResource GoldButtonStyle}" ToolTip="Mostra o XAML puro do autounattend.xml"/>
                                         <Button Grid.Column="1" Content="⚙️ AVANÇADO" Height="32" Margin="5,0,0,0" Click="BtnQuickAdvanced_Click" Style="{StaticResource SecondaryButtonStyle}" ToolTip="Abre as opções completas (INICIAR CRIAÇÃO)"/>
                                     </Grid>
-                                    <TextBlock x:Name="TxtQuickHint" Text="Dica: padrão pt-BR. Alterações aqui já valem no INICIAR CRIAÇÃO." FontSize="11" Foreground="#FFD700" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="TxtQuickHint" Text="Dica: padrão pt-BR. Alterações aqui já valem no INICIAR CRIAÇÃO." FontSize="11" Foreground="{DynamicResource AccentColor}" Margin="0,6,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -208,11 +161,11 @@
                 <!-- Help Section moved inside Main View -->
                 <Border Background="#0AFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,20">
                     <StackPanel>
-                        <TextBlock Text="❔ COMO FUNCIONA O WINBOOT" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
-                        <TextBlock Text="1. Seleção: Escolha o disco e a imagem ISO." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
-                        <TextBlock Text="2. Identificação: O sistema analisará a ISO automaticamente." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
-                        <TextBlock Text="3. Customização: Você escolherá as opções compatíveis." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
-                        <TextBlock Text="4. Criação: A partição 'KITLUGIA' será preparada e o boot configurado." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="❔ COMO FUNCIONA O WINBOOT" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,10"/>
+                        <TextBlock Text="1. Seleção: Escolha o disco e a imagem ISO." Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="2. Identificação: O sistema analisará a ISO automaticamente." Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="3. Customização: Você escolherá as opções compatíveis." Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="4. Criação: A partição 'KITLUGIA' será preparada e o boot configurado." Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
                     </StackPanel>
                 </Border>
 
@@ -228,7 +181,7 @@
                 </Grid>
 
                 <!-- Expandable Detailed Log -->
-                <Expander Header="LOG DETALHADO (DIAGNÓSTICO E EXECUÇÃO)" Background="Transparent" Foreground="{StaticResource TextMuted}" Margin="0,0,0,20">
+                <Expander Header="LOG DETALHADO (DIAGNÓSTICO E EXECUÇÃO)" Background="Transparent" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,20">
                     <Border Background="#05000000" CornerRadius="8" Padding="10" Margin="0,5,0,0" BorderBrush="#11FFFFFF" BorderThickness="1">
                         <TextBox x:Name="TxtLogViewer" Height="150" Background="Transparent" Foreground="#88FFFFFF" 
                                  BorderThickness="0" FontFamily="Consolas" TextWrapping="Wrap" IsReadOnly="True"
@@ -244,7 +197,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Status:" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,10,0"/>
+                            <TextBlock Text="Status:" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,10,0"/>
                             <TextBlock x:Name="TxtStatus" Text="Aguardando início..." Foreground="White"/>
                         </StackPanel>
                         <!-- Botão Otimizador Pré-Shrink -->
@@ -256,14 +209,14 @@
                     <StackPanel>
                         <TextBlock Text="🗑️ SELEÇÃO DE REMOÇÃO" FontSize="13" FontWeight="Bold" Foreground="#FF5555" Margin="0,0,0,15"/>
                         <TextBlock Text="Múltiplas partições Winboot detectadas. Selecione qual deseja remover:" Foreground="#CCCCCC" Margin="0,0,0,10"/>
-                        <ComboBox x:Name="ComboRemovalCandidates" Height="40" Style="{StaticResource DarkComboBoxStyle}">
+                        <ComboBox x:Name="ComboRemovalCandidates" Height="40">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding DisplayName}" Foreground="White" Padding="5"/>
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
-                        <TextBlock x:Name="TxtRemovalInfo" Text="A partição selecionada será deletada e seu espaço será devolvido ao disco." FontSize="11" Foreground="#888888" TextWrapping="Wrap" Margin="0,10,0,15"/>
+                        <TextBlock x:Name="TxtRemovalInfo" Text="A partição selecionada será deletada e seu espaço será devolvido ao disco." FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,10,0,15"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Content="CANCELAR" Width="120" Margin="0,0,10,0" Click="BtnCancelRemoval_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                             <Button Content="CONFIRMAR EXCLUSÃO" Width="180" Background="#992222" Foreground="White" Click="BtnConfirmRemoval_Click" Style="{StaticResource SecondaryButtonStyle}"/>
@@ -275,7 +228,7 @@
         </ScrollViewer>
 
         <!-- Footer Actions -->
-        <Border Grid.Row="2" Background="{StaticResource CardBackground}" Margin="-30,20,-30,-30" Padding="30">
+        <Border Grid.Row="2" Background="{DynamicResource CardBackground}" Margin="-30,20,-30,-30" Padding="30">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -283,8 +236,8 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="Atenção: Este processo modificará partições do sistema." FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                    <TextBlock Text="Certifique-se de que possui backup dos seus dados críticos." FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                    <TextBlock Text="Atenção: Este processo modificará partições do sistema." FontSize="11" Foreground="{DynamicResource TextMuted}"/>
+                    <TextBlock Text="Certifique-se de que possui backup dos seus dados críticos." FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -297,7 +250,7 @@
 
         <!-- Configuration Overlay -->
         <Border x:Name="OverlayConfig" Grid.RowSpan="3" Background="#EE000000" Visibility="Collapsed" Margin="-30">
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="2" CornerRadius="15" 
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="2" CornerRadius="15" 
                     Width="650" MaxHeight="650" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -307,8 +260,8 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Margin="0,0,0,20">
-                        <TextBlock x:Name="TxtConfigTitle" Text="⚙️ CONFIGURAR INSTALAÇÃO" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
-                        <TextBlock x:Name="TxtConfigIsoInfo" Text="Identificando ISO..." Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" FontSize="12" Margin="0,5,0,0"/>
+                        <TextBlock x:Name="TxtConfigTitle" Text="⚙️ CONFIGURAR INSTALAÇÃO" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="TxtConfigIsoInfo" Text="Identificando ISO..." Foreground="{DynamicResource TextMuted}" HorizontalAlignment="Center" FontSize="12" Margin="0,5,0,0"/>
                     </StackPanel>
 
                     <ScrollViewer Grid.Row="1" Margin="0,0,0,20" VerticalScrollBarVisibility="Auto">
@@ -316,28 +269,28 @@
                             <!-- Options for Windows -->
                             <StackPanel x:Name="PanelWindowsOptions">
                                 <StackPanel x:Name="PanelGeneratorCheckboxes">
-                                    <TextBlock Text="RUFUS-STYLE AUTOMATION" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                                    <TextBlock Text="RUFUS-STYLE AUTOMATION" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                                     <CheckBox x:Name="ChkBypassTpm" Content="Ignorar requisitos do Windows 11 (TPM 2.0, Secure Boot, RAM)" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                                     <CheckBox x:Name="ChkLocalAccount" Content="Remover exigência de Conta Microsoft (Forçar conta local)" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                                     <CheckBox x:Name="ChkDisablePrivacy" Content="Desabilitar Telemetria e Privacidade" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
-                                    <CheckBox x:Name="ChkFullAuto" Content="Instalação Totalmente Autônoma" Foreground="{StaticResource AccentColor}" Margin="0,0,0,8" IsChecked="True"/>
+                                    <CheckBox x:Name="ChkFullAuto" Content="Instalação Totalmente Autônoma" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8" IsChecked="True"/>
                                     <CheckBox x:Name="ChkExportDrivers" Content="Exportar Drivers do Host (Evita Tela Azul)" Foreground="White" Margin="0,0,0,8" IsChecked="False"/>
-                                    <CheckBox x:Name="ChkSafeMode" Content="🛡️ MODO SEGURO (Sem strings de texto - 100% universal)" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15" IsChecked="False"/>
+                                    <CheckBox x:Name="ChkSafeMode" Content="🛡️ MODO SEGURO (Sem strings de texto - 100% universal)" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,15" IsChecked="False"/>
                                 </StackPanel>
 
                                 <StackPanel x:Name="PanelUserAccount">
-                                    <TextBlock Text="CONTA DE USUÁRIO" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                                    <TextBlock Text="CONTA DE USUÁRIO" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                                     <Grid Margin="0,0,0,15">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Margin="0,0,5,0">
-                                            <TextBlock Text="Nome:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
+                                            <TextBlock Text="Nome:" Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                             <TextBox x:Name="TxtUserName" Text="Usuário" Style="{StaticResource DarkTextBoxStyle}" Height="30"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Margin="5,0,0,0">
-                                            <TextBlock Text="Senha:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
+                                            <TextBlock Text="Senha:" Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                             <PasswordBox x:Name="TxtPassword" Style="{StaticResource DarkPasswordBoxStyle}" Height="30"/>
                                         </StackPanel>
                                     </Grid>
@@ -345,9 +298,9 @@
 
                                 <!-- Idioma do Sistema - escolha personalizável (fix: nunca iniciar em inglês por padrão) -->
                                 <StackPanel x:Name="PanelLanguageSelection" Margin="0,0,0,15">
-                                    <TextBlock Text="🌍 IDIOMA DO SISTEMA" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
-                                    <TextBlock Text="Escolha o idioma do Windows instalado. Padrão: Português (Brasil) — garante que não inicie em inglês." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                    <ComboBox x:Name="CmbWinbootLanguage" Height="36" Style="{StaticResource DarkComboBoxStyle}">
+                                    <TextBlock Text="🌍 IDIOMA DO SISTEMA" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
+                                    <TextBlock Text="Escolha o idioma do Windows instalado. Padrão: Português (Brasil) — garante que não inicie em inglês." FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                    <ComboBox x:Name="CmbWinbootLanguage" Height="36">
                                         <ComboBoxItem Content="Português (Brasil) — pt-BR" Tag="pt-BR" IsSelected="True"/>
                                         <ComboBoxItem Content="English (United States) — en-US" Tag="en-US"/>
                                         <ComboBoxItem Content="Español (España) — es-ES" Tag="es-ES"/>
@@ -361,10 +314,10 @@
                                         <ComboBoxItem Content="Русский (Россия) — ru-RU" Tag="ru-RU"/>
                                         <ComboBoxItem Content="العربية (السعودية) — ar-SA" Tag="ar-SA"/>
                                     </ComboBox>
-                                    <TextBlock x:Name="TxtWinbootLanguageHint" Text="Padrão: pt-BR (Português BR). Teclado e fuso ajustados automaticamente." FontSize="11" Foreground="#FFD700" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="TxtWinbootLanguageHint" Text="Padrão: pt-BR (Português BR). Teclado e fuso ajustados automaticamente." FontSize="11" Foreground="{DynamicResource AccentColor}" Margin="0,6,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
 
-                                <TextBlock Text="PÓS-INSTALAÇÃO" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                                <TextBlock Text="PÓS-INSTALAÇÃO" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                                 <CheckBox x:Name="ChkInjectKit" Content="Injetar KitLugia (Instalação Automática)" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                                 <CheckBox x:Name="ChkAutoCleanup" Content="Limpeza Automática após instalação" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
 
@@ -372,25 +325,24 @@
                                 <Border Background="#1E1E2E" BorderBrush="#3B3B4F" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,15">
                                     <StackPanel>
                                         <CheckBox x:Name="ChkDownloadDotnet" Content="📥 Baixar .NET Desktop Runtime 8.0 automaticamente" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
-                                        <TextBlock Text="Se o instalador não existir localmente, o KitLugia baixará automaticamente (~50MB) do Microsoft CDN." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,5"/>
-                                        <TextBlock Text="• Salvo em Resources para uso futuro" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,3"/>
-                                        <TextBlock Text="• Se desmarcado, usará winget na primeira inicialização (requer internet)" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                        <TextBlock Text="Se o instalador não existir localmente, o KitLugia baixará automaticamente (~50MB) do Microsoft CDN." FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,5"/>
+                                        <TextBlock Text="• Salvo em Resources para uso futuro" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,3"/>
+                                        <TextBlock Text="• Se desmarcado, usará winget na primeira inicialização (requer internet)" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                                     </StackPanel>
                                 </Border>
 
-                                <TextBlock Text="PERFIL DE AUTOMAÇÃO (CONFIGURAÇÃO CUSTOMIZADA)" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                                <TextBlock Text="PERFIL DE AUTOMAÇÃO (CONFIGURAÇÃO CUSTOMIZADA)" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                                 <ComboBox x:Name="ComboAutomationProfiles" Height="40" Margin="0,0,0,5"
-                                          Style="{StaticResource DarkComboBoxStyle}"
                                           SelectionChanged="ComboAutomationProfiles_SelectionChanged">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
                                             <StackPanel>
                                                 <TextBlock x:Name="TxtFriendlyName" Text="{Binding FriendlyName}" FontWeight="Bold" Foreground="White" Padding="5,5,5,0"/>
-                                                <TextBlock Text="{Binding Description}" FontSize="11" Foreground="{StaticResource TextMuted}" Padding="5,0,5,5"/>
+                                                <TextBlock Text="{Binding Description}" FontSize="11" Foreground="{DynamicResource TextMuted}" Padding="5,0,5,5"/>
                                             </StackPanel>
                                             <DataTemplate.Triggers>
                                                 <DataTrigger Binding="{Binding IsRecommended}" Value="True">
-                                                    <Setter TargetName="TxtFriendlyName" Property="Foreground" Value="{StaticResource AccentColor}"/>
+                                                    <Setter TargetName="TxtFriendlyName" Property="Foreground" Value="{DynamicResource AccentColor}"/>
                                                 </DataTrigger>
                                             </DataTemplate.Triggers>
                                         </DataTemplate>
@@ -405,7 +357,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="TxtCustomXmlInfo" Text="Usando gerador interno" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtCustomXmlInfo" Text="Usando gerador interno" Foreground="{DynamicResource TextMuted}" FontSize="11" VerticalAlignment="Center"/>
                                     <Button Grid.Column="1" Content="⚙️" Width="40" Height="30" Margin="5,0,5,0" ToolTip="Editar autounattend.xml" Click="BtnEditAutounattend_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                     <Button Grid.Column="2" Content="IMPORTAR XML" Padding="10,3" Click="BtnImportXml_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                     <Button Grid.Column="3" Content="📁 CUSTOM" Padding="10,3" Margin="5,0,0,0" ToolTip="Usar arquivo autounattend.xml customizado" Click="BtnBrowseCustomAutounattend_Click" Style="{StaticResource GoldButtonStyle}"/>
@@ -414,8 +366,8 @@
 
                             <!-- File Injection -->
                             <StackPanel x:Name="PanelFileInjection" Margin="0,0,0,15">
-                                <TextBlock Text="INJEÇÃO DE ARQUIVOS (ADAPTATIVO)" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
-                                <TextBlock Text="Selecione uma pasta para copiar automaticamente para a Área de Trabalho após a formatação. O tamanho da partição será ajustado automaticamente." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,5"/>
+                                <TextBlock Text="INJEÇÃO DE ARQUIVOS (ADAPTATIVO)" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
+                                <TextBlock Text="Selecione uma pasta para copiar automaticamente para a Área de Trabalho após a formatação. O tamanho da partição será ajustado automaticamente." FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,5"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -427,20 +379,20 @@
                             </StackPanel>
 
                             <!-- Generic Options -->
-                            <TextBlock Text="SISTEMA DE ARQUIVOS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <TextBlock Text="SISTEMA DE ARQUIVOS" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                             <CheckBox x:Name="ChkMultiIso" Content="Modo Multi-ISO / FAT32 (Obrigatório para Strelec/Linux)" Foreground="White" Margin="0,0,0,15" IsChecked="False"/>
 
                             <Border Background="#1A1A2E" BorderBrush="#FF4444" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,15">
                                 <StackPanel>
                                     <CheckBox x:Name="ChkEmergencyPreBoot" Content="🚨 Emergency Pre-Boot (WinRE + DISM)" Foreground="#FF6666" Margin="0,0,0,8" IsChecked="False" Checked="ChkEmergencyPreBoot_Checked"/>
-                                    <TextBlock Text="Se o shrink falhar por arquivos travados, usa o Windows RE modificado via DISM para concluir a operação. O sistema reiniciará automaticamente." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="22,0,0,5"/>
+                                    <TextBlock Text="Se o shrink falhar por arquivos travados, usa o Windows RE modificado via DISM para concluir a operação. O sistema reiniciará automaticamente." FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="22,0,0,5"/>
                                     <TextBlock x:Name="TxtEmergencyWarning" Text="⚠️ Requer winre.wim original em C:\Windows\System32\Recovery. Usa DISM e reagentc (built-in)." FontSize="11" Foreground="#FFAA44" TextWrapping="Wrap" Margin="22,0,0,0" Visibility="Collapsed"/>
                                 </StackPanel>
                             </Border>
 
                             <Border Background="#11FFFFFF" Padding="15" CornerRadius="8">
                                 <TextBlock Text="A partição Winboot será protegida contra deleção acidental na tela de seleção do disco do Windows."
-                                           FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                                           FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
                             </Border>
                         </StackPanel>
                     </ScrollViewer>
@@ -456,7 +408,7 @@
 
         <!-- Loading Overlay (Estilo PartitionPage) -->
         <Border x:Name="OverlayBusy" Grid.RowSpan="3" Background="#EE000000" Visibility="Collapsed" Margin="-30">
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="15"
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="15"
                     Width="600" MaxHeight="550" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30" Effect="{DynamicResource DropShadowEffect}">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -466,7 +418,7 @@
                     </Grid.RowDefinitions>
 
                     <!-- Title -->
-                    <TextBlock Grid.Row="0" x:Name="TxtOpTitle" Text="EXECUTANDO OPERAÇÃO" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10" HorizontalAlignment="Center"/>
+                    <TextBlock Grid.Row="0" x:Name="TxtOpTitle" Text="EXECUTANDO OPERAÇÃO" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,10" HorizontalAlignment="Center"/>
 
                     <!-- Scrollable Content Area -->
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" MaxHeight="380" Margin="0,0,0,15">
@@ -475,12 +427,12 @@
 
                             <!-- Progress Section -->
                             <Grid x:Name="PanelProgress" Margin="0,0,0,15">
-                                <ProgressBar x:Name="ProgOp" IsIndeterminate="True" Height="6" Foreground="{StaticResource AccentColor}" Background="#1A1A1A" BorderThickness="0" Minimum="0" Maximum="100"/>
+                                <ProgressBar x:Name="ProgOp" IsIndeterminate="True" Height="6" Foreground="{DynamicResource AccentColor}" Background="{DynamicResource Surface1}" BorderThickness="0" Minimum="0" Maximum="100"/>
                             </Grid>
 
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
                                 <!-- Rotating Processing Icon -->
-                                <TextBlock Text="⚙️" Foreground="{StaticResource AccentColor}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" RenderTransformOrigin="0.5,0.5">
+                                <TextBlock Text="⚙️" Foreground="{DynamicResource AccentColor}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" RenderTransformOrigin="0.5,0.5">
                                     <TextBlock.RenderTransform>
                                         <RotateTransform x:Name="RotationTransform" Angle="0"/>
                                     </TextBlock.RenderTransform>
@@ -494,7 +446,7 @@
                                         </EventTrigger>
                                     </TextBlock.Triggers>
                                 </TextBlock>
-                                <TextBlock x:Name="TxtOpStatus" Text="Status: Processando..." Foreground="{StaticResource TextMuted}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="TxtOpStatus" Text="Status: Processando..." Foreground="{DynamicResource TextMuted}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"/>
                             </StackPanel>
 
                             <!-- Safety Warning -->
@@ -526,7 +478,7 @@
                                 </EventTrigger>
                             </Ellipse.Triggers>
                         </Ellipse>
-                        <TextBlock x:Name="TxtLiveActivity" Text="..." Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Consolas"
+                        <TextBlock x:Name="TxtLiveActivity" Text="..." Foreground="{DynamicResource TextMuted}" FontSize="11" FontFamily="Consolas"
                                    VerticalAlignment="Center" Opacity="0.5" TextTrimming="CharacterEllipsis" MaxWidth="350"/>
                     </StackPanel>
                 </Grid>
@@ -535,7 +487,7 @@
 
         <!-- Autounattend Editor Overlay -->
         <Border x:Name="OverlayAutounattendEditor" Grid.RowSpan="3" Background="#EE000000" Visibility="Collapsed" Margin="-30">
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="2" CornerRadius="15"
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="2" CornerRadius="15"
                     Width="900" MaxHeight="750" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -545,8 +497,8 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Margin="0,0,0,20">
-                        <TextBlock Text="⚙️ EDITOR DE ARQUIVO AUTOUNATTEND.XML" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="Edite manualmente o arquivo XML para controle total da instalação" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" FontSize="12" Margin="0,5,0,0"/>
+                        <TextBlock Text="⚙️ EDITOR DE ARQUIVO AUTOUNATTEND.XML" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Edite manualmente o arquivo XML para controle total da instalação" Foreground="{DynamicResource TextMuted}" HorizontalAlignment="Center" FontSize="12" Margin="0,5,0,0"/>
                     </StackPanel>
 
                     <TextBox x:Name="TxtAutounattendXml" Grid.Row="1" Style="{StaticResource DarkTextBoxStyle}" Height="500" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11"/>
@@ -561,7 +513,7 @@
 
         <!-- Autounattend Generator Overlay -->
         <Border x:Name="OverlayAutounattend" Grid.RowSpan="3" Background="#EE000000" Visibility="Collapsed" Margin="-30">
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="2" CornerRadius="15"
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="2" CornerRadius="15"
                     Width="700" MaxHeight="700" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -571,40 +523,40 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Margin="0,0,0,20">
-                        <TextBlock Text="📝 GERADOR DE ARQUIVO AUTOUNATTEND.XML" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="Configure as opções para instalação desassistida do Windows" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" FontSize="12" Margin="0,5,0,0"/>
+                        <TextBlock Text="📝 GERADOR DE ARQUIVO AUTOUNATTEND.XML" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Configure as opções para instalação desassistida do Windows" Foreground="{DynamicResource TextMuted}" HorizontalAlignment="Center" FontSize="12" Margin="0,5,0,0"/>
                     </StackPanel>
 
                     <ScrollViewer Grid.Row="1" Margin="0,0,0,20" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <!-- Configurações Básicas -->
-                            <TextBlock Text="⚙️ CONFIGURAÇÕES BÁSICAS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <TextBlock Text="⚙️ CONFIGURAÇÕES BÁSICAS" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                             <CheckBox x:Name="ChkAuBypassTpm" Content="Ignorar requisitos do Windows 11 (TPM 2.0, Secure Boot, RAM)" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                             <CheckBox x:Name="ChkAuLocalAccount" Content="Forçar criação de conta local (pular Conta Microsoft)" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                             <CheckBox x:Name="ChkAuDisablePrivacy" Content="Desabilitar Telemetria e Privacidade do Windows" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
-                            <CheckBox x:Name="ChkAuFullAuto" Content="Instalação totalmente automática (sem interação do usuário)" Foreground="{StaticResource AccentColor}" Margin="0,0,0,8" IsChecked="True"/>
+                            <CheckBox x:Name="ChkAuFullAuto" Content="Instalação totalmente automática (sem interação do usuário)" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8" IsChecked="True"/>
                             <CheckBox x:Name="ChkAuDisableDefender" Content="Desabilitar Windows Defender" Foreground="White" Margin="0,0,0,8" IsChecked="False"/>
                             <CheckBox x:Name="ChkAuShowAllEditions" Content="Mostrar todas as edições do Windows (Home/Pro/Enterprise)" Foreground="White" Margin="0,0,0,15" IsChecked="False"/>
 
                             <!-- Conta de Usuário -->
-                            <TextBlock Text="👤 CONTA DE USUÁRIO" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <TextBlock Text="👤 CONTA DE USUÁRIO" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                             <Grid Margin="0,0,0,15">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Margin="0,0,5,0">
-                                    <TextBlock Text="Nome do usuário:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
+                                    <TextBlock Text="Nome do usuário:" Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                     <TextBox x:Name="TxtAuUserName" Text="Usuário" Style="{StaticResource DarkTextBoxStyle}" Height="30"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="5,0,0,0">
-                                    <TextBlock Text="Senha (opcional):" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
+                                    <TextBlock Text="Senha (opcional):" Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
                                     <PasswordBox x:Name="TxtAuPassword" Style="{StaticResource DarkPasswordBoxStyle}" Height="30"/>
                                 </StackPanel>
                             </Grid>
 
                             <!-- Configurações Avançadas -->
-                            <TextBlock Text="🔧 CONFIGURAÇÕES AVANÇADAS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <TextBlock Text="🔧 CONFIGURAÇÕES AVANÇADAS" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                             <CheckBox x:Name="ChkAuAutoLogon" Content="Login automático na primeira inicialização" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                             <CheckBox x:Name="ChkAuRemoteDesktop" Content="Habilitar Área de Trabalho Remota" Foreground="White" Margin="0,0,0,8" IsChecked="False"/>
                             <CheckBox x:Name="ChkAuDisableBitlocker" Content="Desabilitar BitLocker automático" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
@@ -612,7 +564,7 @@
                             <CheckBox x:Name="ChkAuDisableCopilot" Content="Desabilitar Windows Copilot" Foreground="White" Margin="0,0,0,15" IsChecked="True"/>
 
                             <!-- Desabilitar Bloatware e Apps -->
-                            <TextBlock Text="🗑️ DESABILITAR BLOATWARE E APPS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <TextBlock Text="🗑️ DESABILITAR BLOATWARE E APPS" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                             <CheckBox x:Name="ChkAuRemoveEdge" Content="Remover Microsoft Edge" Foreground="White" Margin="0,0,0,8" IsChecked="False"/>
                             <CheckBox x:Name="ChkAuRemoveCortana" Content="Desabilitar Cortana" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                             <CheckBox x:Name="ChkAuRemoveOneDrive" Content="Remover OneDrive" Foreground="White" Margin="0,0,0,8" IsChecked="False"/>
@@ -635,23 +587,23 @@
                             <CheckBox x:Name="ChkAuRemovePaint3D" Content="Remover Paint 3D" Foreground="White" Margin="0,0,0,15" IsChecked="True"/>
 
                             <!-- Idioma e Região -->
-                            <TextBlock Text="🌍 IDIOMA E REGIÃO" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <TextBlock Text="🌍 IDIOMA E REGIÃO" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                             <Grid Margin="0,0,0,15">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Margin="0,0,5,0">
-                                    <TextBlock Text="Idioma:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
-                                    <ComboBox x:Name="CmbAuLanguage" Height="30" Style="{StaticResource DarkComboBoxStyle}">
+                                    <TextBlock Text="Idioma:" Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
+                                    <ComboBox x:Name="CmbAuLanguage" Height="30">
                                         <ComboBoxItem Content="Português (Brasil)" Tag="pt-BR" IsSelected="True"/>
                                         <ComboBoxItem Content="English (United States)" Tag="en-US"/>
                                         <ComboBoxItem Content="Español (España)" Tag="es-ES"/>
                                     </ComboBox>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="5,0,0,0">
-                                    <TextBlock Text="Fuso Horário:" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
-                                    <ComboBox x:Name="CmbAuTimeZone" Height="30" Style="{StaticResource DarkComboBoxStyle}">
+                                    <TextBlock Text="Fuso Horário:" Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,0,0,3"/>
+                                    <ComboBox x:Name="CmbAuTimeZone" Height="30">
                                         <ComboBoxItem Content="Horário de Brasília (BRT)" Tag="E. South America Standard Time" IsSelected="True"/>
                                         <ComboBoxItem Content="Eastern Time (EUA)" Tag="Eastern Standard Time"/>
                                         <ComboBoxItem Content="Pacific Time (EUA)" Tag="Pacific Standard Time"/>
@@ -668,19 +620,19 @@
                             </Grid>
 
                             <!-- Comandos Pós-Instalação -->
-                            <TextBlock Text="💻 COMANDOS PÓS-INSTALAÇÃO" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
-                            <TextBlock Text="Comandos para executar no primeiro login (um por linha):" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,0,0,5"/>
+                            <TextBlock Text="💻 COMANDOS PÓS-INSTALAÇÃO" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
+                            <TextBlock Text="Comandos para executar no primeiro login (um por linha):" Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,0,0,5"/>
                             <TextBox x:Name="TxtAuCommands" Style="{StaticResource DarkTextBoxStyle}" Height="80" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
                                      Text="dism /online /export-driver /destination:C:\DriversBackup"/>
 
                             <!-- Windows Update -->
-                            <TextBlock Text="🔄 WINDOWS UPDATE" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <TextBlock Text="🔄 WINDOWS UPDATE" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                             <CheckBox x:Name="ChkAuDisableAutoUpdate" Content="Desabilitar atualizações automáticas (apenas manual)" Foreground="White" Margin="0,0,0,8" IsChecked="False"/>
                             <CheckBox x:Name="ChkAuDisableDeliveryOpt" Content="Desabilitar Delivery Optimization (download de outros PCs)" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                             <CheckBox x:Name="ChkAuDelayUpdates" Content="Atrasar atualizações em 365 dias (apenas segurança)" Foreground="White" Margin="0,0,0,15" IsChecked="False"/>
 
                             <!-- Registry Tweaks -->
-                            <TextBlock Text="📝 REGISTRY TWEAKS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <TextBlock Text="📝 REGISTRY TWEAKS" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                             <CheckBox x:Name="ChkAuLongPaths" Content="Habilitar Long File Paths (32.767 caracteres)" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                             <CheckBox x:Name="ChkAuDisableLocation" Content="Desabilitar Location Tracking" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                             <CheckBox x:Name="ChkAuDisableActivity" Content="Desabilitar Activity History" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
@@ -692,7 +644,7 @@
                             <CheckBox x:Name="ChkAuDisableUAC" Content="Desabilitar UAC (User Account Control)" Foreground="#FF5555" Margin="0,0,0,15" IsChecked="False"/>
 
                             <!-- OOBE Settings -->
-                            <TextBlock Text="🖥️ CONFIGURAÇÕES OOBE" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <TextBlock Text="🖥️ CONFIGURAÇÕES OOBE" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                             <CheckBox x:Name="ChkAuHideEula" Content="Ocultar página de licença EULA" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                             <CheckBox x:Name="ChkAuHideOEM" Content="Ocultar tela de registro OEM" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
                             <CheckBox x:Name="ChkAuHideWireless" Content="Ocultar configuração de rede sem fio" Foreground="White" Margin="0,0,0,8" IsChecked="True"/>
@@ -700,7 +652,7 @@
                             <CheckBox x:Name="ChkAuProtectYourPC" Content="Proteger seu PC (nível 3 = recomendado)" Foreground="White" Margin="0,0,0,15" IsChecked="True"/>
 
                             <!-- Computer Name -->
-                            <TextBlock Text="💻 NOME DO COMPUTADOR" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <TextBlock Text="💻 NOME DO COMPUTADOR" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,10"/>
                             <TextBox x:Name="TxtAuComputerName" Style="{StaticResource DarkTextBoxStyle}" Height="30" VerticalContentAlignment="Center" Text="" ToolTip="Deixe vazio para gerar nome aleatório"/>
                         </StackPanel>
                     </ScrollViewer>

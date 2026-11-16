@@ -155,7 +155,7 @@
 
         <!-- BOTTOM STATUS -->
         <Border Grid.Row="3" Background="#0A0A18" Padding="20,8" BorderBrush="#3A3A50" BorderThickness="0,1,0,0">
-            <TextBlock x:Name="TxtStatus" Text="Clique em Atualizar para carregar as entradas" FontSize="11" Foreground="#555"/>
+            <TextBlock x:Name="TxtStatus" Text="Clique em Atualizar para carregar as entradas" FontSize="11" Foreground="{DynamicResource BorderStrong}"/>
         </Border>
     </Grid>
 </Window>

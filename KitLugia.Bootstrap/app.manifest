@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+	<assemblyIdentity version="1.0.0.0" name="KitLugia.Bootstrap.app"/>
+
+	<trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+		<security>
+			<!--
+				asInvoker (e NAO requireAdministrator como o app principal):
+				o launcher precisa abrir a tela "Componentes Adicionais Necesarios" ANTES
+				de qualquer coisa, e o UAC e' pedido pelo instalador oficial da Microsoft
+				(no proprio instalador) e pelo app principal. Pedir admin aqui faria o
+				usuario receber um UAC antes mesmo de saber o que esta acontecendo.
+			-->
+			<requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+				<requestedExecutionLevel level="asInvoker" uiAccess="false" />
+			</requestedPrivileges>
+		</security>
+	</trustInfo>
+
+	<compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+		<application>
+			<!-- Windows 10 -->
+			<supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+			<!-- Windows 11 nao tem GUID proprio: usa o mesmo do Windows 10 -->
+		</application>
+	</compatibility>
+
+	<application xmlns="urn:schemas-microsoft-com:asm.v3">
+		<windowsSettings>
+			<dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
+			<dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+		</windowsSettings>
+	</application>
+
+	<dependency>
+		<dependentAssembly>
+			<assemblyIdentity
+				type="win32"
+				name="Microsoft.Windows.Common-Controls"
+				version="6.0.0.0"
+				processorArchitecture="*"
+				publicKeyToken="6595b64144ccf1df"
+				language="*"
+			/>
+		</dependentAssembly>
+	</dependency>
+
+</assembly>

@@ -6,7 +6,7 @@
         Width="820"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        Background="#0F0F0F"
+        Background="{DynamicResource Surface0}"
         WindowStyle="None"
         SnapsToDevicePixels="True"
         UseLayoutRounding="True">
@@ -86,7 +86,7 @@
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" ResizeBorderThickness="4"/>
     </WindowChrome.WindowChrome>
-    <Border BorderBrush="#FFD700" BorderThickness="1">
+    <Border BorderBrush="{DynamicResource AccentColor}" BorderThickness="1">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -97,19 +97,19 @@
 
         <!-- Title -->
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock x:Name="TitleText" Text="Deep Cleanup" FontSize="22" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
+            <TextBlock x:Name="TitleText" Text="Deep Cleanup" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
             <TextBlock x:Name="SubtitleText" Text="Selecione os resíduos para remover" FontSize="13" Foreground="#AAA" Margin="0,4,0,0"/>
         </StackPanel>
 
         <!-- Info bar: summary of found items -->
-        <Border Grid.Row="1" Background="#252525" CornerRadius="5" Padding="14,10" Margin="0,0,0,12">
+        <Border Grid.Row="1" Background="{DynamicResource Surface2}" CornerRadius="5" Padding="14,10" Margin="0,0,0,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="InfoBarText" Text="Analisando..." FontSize="12" Foreground="#BBB" VerticalAlignment="Center"/>
-                <TextBlock x:Name="InfoBarCount" Grid.Column="1" Text="" FontSize="12" Foreground="{StaticResource AccentColor}" FontWeight="Bold" VerticalAlignment="Center"/>
+                <TextBlock x:Name="InfoBarCount" Grid.Column="1" Text="" FontSize="12" Foreground="{DynamicResource AccentColor}" FontWeight="Bold" VerticalAlignment="Center"/>
             </Grid>
         </Border>
 
@@ -130,7 +130,7 @@
                     </Grid.RowDefinitions>
 
                     <!-- Toolbar -->
-                    <Border Grid.Row="0" Background="#252525" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+                    <Border Grid.Row="0" Background="{DynamicResource Surface2}" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -192,7 +192,7 @@
                     </Grid.RowDefinitions>
 
                     <!-- Toolbar -->
-                    <Border Grid.Row="0" Background="#252525" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+                    <Border Grid.Row="0" Background="{DynamicResource Surface2}" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -247,7 +247,7 @@
         </TabControl>
 
         <!-- Bottom bar -->
-        <Border Grid.Row="3" Background="#252525" CornerRadius="5" Padding="14,10" Margin="0,12,0,0">
+        <Border Grid.Row="3" Background="{DynamicResource Surface2}" CornerRadius="5" Padding="14,10" Margin="0,12,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>

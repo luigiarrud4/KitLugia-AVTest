@@ -4,12 +4,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Entrada de Dados" Height="220" Width="400"
         WindowStartupLocation="CenterScreen"
-        Background="#1A1A2E" BorderBrush="{StaticResource CardBorder}" BorderThickness="1"
+        Background="#1A1A2E" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1"
         ResizeMode="NoResize" WindowStyle="None" AllowsTransparency="True">
     
     <Border CornerRadius="12" Background="#1A1A2E" BorderBrush="#33FFD700" BorderThickness="1" Padding="25">
         <StackPanel>
-            <TextBlock x:Name="TxtTitle" Text="T&#xED;tulo" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
+            <TextBlock x:Name="TxtTitle" Text="T&#xED;tulo" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,10"/>
             <TextBlock x:Name="TxtMessage" Text="Mensagem aqui..." Foreground="White" TextWrapping="Wrap" Margin="0,0,0,15"/>
             
             <TextBox x:Name="TxtInput" FontSize="16" Padding="10,8" Background="#0A0A0A" Foreground="White" BorderBrush="#444" 

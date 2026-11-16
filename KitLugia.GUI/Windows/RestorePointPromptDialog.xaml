@@ -20,7 +20,7 @@
 
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="&#x1F4CB; Ponto de Restauração" FontSize="22" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
+            <TextBlock Text="&#x1F4CB; Ponto de Restauração" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
             <TextBlock x:Name="AppNameText" Text="" FontSize="14" Foreground="#CCC" Margin="0,6,0,0"/>
         </StackPanel>
 
@@ -52,7 +52,7 @@
                     FontWeight="SemiBold" FontSize="13"
                     Click="BtnNo_Click" Margin="0,0,8,0"/>
             <Button x:Name="BtnYes" Content="Sim" Width="120" Height="36"
-                    Background="{StaticResource AccentColor}" Foreground="White"
+                    Background="{DynamicResource AccentColor}" Foreground="White"
                     BorderThickness="0" Cursor="Hand"
                     FontWeight="Bold" FontSize="14"
                     Click="BtnYes_Click"/>

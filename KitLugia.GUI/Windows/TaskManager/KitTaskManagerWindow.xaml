@@ -885,9 +885,9 @@
                                 <TextBlock Text="SISTEMA" Style="{StaticResource TmSectionHeader}" Margin="0,0,0,10"/>
 
                                 <TextBlock Text="CPU" FontSize="10" Foreground="#777"/>
-                                <TextBlock x:Name="TxtSumCpu" Text="—" FontSize="19" FontWeight="Bold" Foreground="#4CAF50"/>
+                                <TextBlock x:Name="TxtSumCpu" Text="—" FontSize="19" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}"/>
                                 <Border Height="5" Background="#0D131A" CornerRadius="2" Margin="0,3,0,10">
-                                    <Border x:Name="BarSumCpu" HorizontalAlignment="Left" Width="0" Background="#4CAF50" CornerRadius="2"/>
+                                    <Border x:Name="BarSumCpu" HorizontalAlignment="Left" Width="0" Background="{DynamicResource SuccessBrush}" CornerRadius="2"/>
                                 </Border>
 
                                 <TextBlock Text="Relógio" FontSize="10" Foreground="#777"/>
@@ -946,7 +946,7 @@
                                             <TextBlock x:Name="TxtSumCpuCores" Text="" FontSize="10" Foreground="#666" VerticalAlignment="Center" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,0,0,0">
-                                            <Ellipse Width="7" Height="7" Fill="#4CAF50" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                            <Ellipse Width="7" Height="7" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" Margin="0,0,4,0"/>
                                             <TextBlock Text="Uso" FontSize="10" Foreground="#888" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                             <Ellipse Width="7" Height="7" Fill="#F44336" VerticalAlignment="Center" Margin="0,0,4,0"/>
                                             <TextBlock Text="Kernel" FontSize="10" Foreground="#888" VerticalAlignment="Center" Margin="0,0,10,0"/>
@@ -962,7 +962,7 @@
                                                 Cursor="Hand" MouseLeftButtonDown="SumCpuCanvas_Click"
                                                 ToolTip="Clique para ver o HISTÓRICO: onde teve pico e QUEM estava usando a CPU naquele momento"/>
                                         <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,8,0">
-                                            <TextBlock x:Name="TxtSumCpuBig" Text="—" FontSize="26" FontWeight="Bold" Foreground="#4CAF50" HorizontalAlignment="Right"/>
+                                            <TextBlock x:Name="TxtSumCpuBig" Text="—" FontSize="26" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" HorizontalAlignment="Right"/>
                                             <TextBlock x:Name="TxtSumCpuSub" Text="" FontSize="10" Foreground="#777" HorizontalAlignment="Right"/>
                                         </StackPanel>
                                         <!-- Eixo de temperatura à direita (paridade TMOG: 110°/55°/0°) -->
@@ -1031,7 +1031,7 @@
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" x:Name="TxtSumCpuVerdict" Text="" FontSize="11" Foreground="#4CAF50"
+                                        <TextBlock Grid.Row="0" x:Name="TxtSumCpuVerdict" Text="" FontSize="11" Foreground="{DynamicResource SuccessBrush}"
                                                    TextWrapping="Wrap"/>
                                         <TextBlock Grid.Row="1" x:Name="TxtSumCpuFooter" Text="" FontSize="10" Foreground="#666" Margin="0,2,0,0"/>
                                     </Grid>
@@ -1232,7 +1232,7 @@
                                         </WrapPanel>
                                     </StackPanel>
                                 </Border>
-                                <TextBlock x:Name="TxtSumTopHint" Grid.Row="2" Text="Clique num processo para ver os detalhes · duplo clique abre na aba Processos · botão direito para agir (a lista congela enquanto o menu está aberto)" FontSize="10" Foreground="#555" Margin="2,6,0,0" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="TxtSumTopHint" Grid.Row="2" Text="Clique num processo para ver os detalhes · duplo clique abre na aba Processos · botão direito para agir (a lista congela enquanto o menu está aberto)" FontSize="10" Foreground="{DynamicResource BorderStrong}" Margin="2,6,0,0" TextWrapping="Wrap"/>
                             </Grid>
                         </Border>
                     </Grid>
@@ -1362,7 +1362,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" x:Name="TxtConnStatus" Text="" FontSize="11" Foreground="#AAA" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Grid.Column="1" Text="F5=Atualizar" FontSize="10" Foreground="#555" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        <TextBlock Grid.Column="1" Text="F5=Atualizar" FontSize="10" Foreground="{DynamicResource BorderStrong}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                     </Grid>
                 </Grid>
 
@@ -2006,7 +2006,7 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="Detalhes do Processo" FontSize="10" Foreground="#555" VerticalAlignment="Center" Margin="12,6,0,6" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="0" Text="Detalhes do Processo" FontSize="10" Foreground="{DynamicResource BorderStrong}" VerticalAlignment="Center" Margin="12,6,0,6" TextTrimming="CharacterEllipsis"/>
                                     <Button Grid.Column="1" x:Name="BtnCloseDetail" Width="22" Height="22" Margin="6,0,6,0" Cursor="Hand" Click="BtnCloseDetail_Click" ToolTip="Fechar painel de detalhes">
                                         <Button.Template>
                                             <ControlTemplate TargetType="Button">
@@ -2116,7 +2116,7 @@
                                                     <TextBlock x:Name="DetailKernelTime" Grid.Row="7" Grid.Column="1" Text="—" Foreground="#F44336" FontSize="11" Margin="0,0,0,3"/>
 
                                                     <TextBlock Grid.Row="8" Text="Tempo usuário" Foreground="#888" FontSize="11" Margin="0,0,0,3"/>
-                                                    <TextBlock x:Name="DetailUserTime" Grid.Row="8" Grid.Column="1" Text="—" Foreground="#4CAF50" FontSize="11" Margin="0,0,0,3"/>
+                                                    <TextBlock x:Name="DetailUserTime" Grid.Row="8" Grid.Column="1" Text="—" Foreground="{DynamicResource SuccessBrush}" FontSize="11" Margin="0,0,0,3"/>
 
                                                     <TextBlock Grid.Row="9" Text="E/S lida" Foreground="#888" FontSize="11" Margin="0,0,0,3"/>
                                                     <TextBlock x:Name="DetailIoRead" Grid.Row="9" Grid.Column="1" Text="—" Foreground="White" FontSize="11" Margin="0,0,0,3"/>
@@ -2154,7 +2154,7 @@
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                                         <TextBlock Text="CPU" Foreground="#888" FontSize="10"/>
-                                                        <TextBlock x:Name="DetailCpu" Text="0%" Foreground="#4CAF50" FontSize="16" FontWeight="Bold"/>
+                                                        <TextBlock x:Name="DetailCpu" Text="0%" Foreground="{DynamicResource SuccessBrush}" FontSize="16" FontWeight="Bold"/>
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="1">
                                                         <TextBlock Text="RAM" Foreground="#888" FontSize="10"/>
@@ -2251,7 +2251,7 @@
                                                         <Button.Template>
                                                             <ControlTemplate TargetType="Button">
                                                                 <Border x:Name="bdr" Background="#1F2A3A" CornerRadius="4" Padding="8,0">
-                                                                    <TextBlock Text="🌱 EcoQoS" FontSize="10" Foreground="#4CAF50" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                    <TextBlock Text="🌱 EcoQoS" FontSize="10" Foreground="{DynamicResource SuccessBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                                 </Border>
                                                                 <ControlTemplate.Triggers>
                                                                     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="bdr" Property="Background" Value="#1A3A2A"/></Trigger>
@@ -2312,7 +2312,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" x:Name="TxtStatus" Text="Carregando processos..." FontSize="11" Foreground="#AAA" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Grid.Column="1" Text="F5=Atualizar | Delete=Finalizar | Ctrl+F=Buscar | Esc=Fechar" FontSize="10" Foreground="#555" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        <TextBlock Grid.Column="1" Text="F5=Atualizar | Delete=Finalizar | Ctrl+F=Buscar | Esc=Fechar" FontSize="10" Foreground="{DynamicResource BorderStrong}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                     </Grid>
                 </Grid>
 
@@ -2379,7 +2379,7 @@
                                     <Grid>
                                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                         <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
-                                        <TextBlock Grid.Row="1" Text="{Binding Summary}" FontSize="11" Foreground="#4CAF50" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Row="1" Text="{Binding Summary}" FontSize="11" Foreground="{DynamicResource SuccessBrush}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                                         <!-- Preview do histórico -->
                                         <Grid Grid.Row="2" Height="38" Margin="0,6,0,0" Background="#0D131A">
                                             <Canvas x:Name="MiniPerfGraph" VerticalAlignment="Stretch"/>
@@ -2400,7 +2400,7 @@
                                 </Grid.RowDefinitions>
                                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4">
                                     <TextBlock x:Name="PerfDeviceTitle" Text="Selecione um componente" FontSize="17" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock x:Name="PerfDeviceUtil" Text="" FontSize="22" FontWeight="Bold" Foreground="#4CAF50" Margin="14,0,0,0" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="PerfDeviceUtil" Text="" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" Margin="14,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <Grid Grid.Row="1" Margin="0,4,0,10">
                                     <Canvas x:Name="PerfBigCanvas" Height="90" Background="#0D131A"/>
@@ -2766,7 +2766,7 @@
                             </StackPanel>
                             <StackPanel Grid.Column="1">
                                 <TextBlock Text="DPC (1 min)" FontSize="9" Foreground="#888"/>
-                                <TextBlock x:Name="LatDpcPct" Text="0,0%" FontSize="15" FontWeight="Bold" Foreground="#4CAF50"/>
+                                <TextBlock x:Name="LatDpcPct" Text="0,0%" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}"/>
                                 <TextBlock Text="pico de UM núcleo" FontSize="9" Foreground="#666"/>
                             </StackPanel>
                             <StackPanel Grid.Column="2">
@@ -2781,12 +2781,12 @@
                             </StackPanel>
                             <StackPanel Grid.Column="4">
                                 <TextBlock Text="PAGINAÇÃO" FontSize="9" Foreground="#888"/>
-                                <TextBlock x:Name="LatHf" Text="0/s" FontSize="15" FontWeight="Bold" Foreground="#4CAF50"/>
+                                <TextBlock x:Name="LatHf" Text="0/s" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}"/>
                                 <TextBlock x:Name="LatHfTotal" Text="0 no total" FontSize="9" Foreground="#666"/>
                             </StackPanel>
                             <StackPanel Grid.Column="5">
                                 <TextBlock Text="SISTEMA TRAVOU" FontSize="9" Foreground="#888"/>
-                                <TextBlock x:Name="LatStall" Text="0x" FontSize="15" FontWeight="Bold" Foreground="#4CAF50"/>
+                                <TextBlock x:Name="LatStall" Text="0x" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}"/>
                                 <TextBlock x:Name="LatStallWorst" Text="pior: —" FontSize="9" Foreground="#666"/>
                             </StackPanel>
                         </Grid>
@@ -2801,9 +2801,9 @@
                         </Grid.RowDefinitions>
 
                         <!-- Conclusão em texto simples (caixa do LatencyMon) -->
-                        <Border x:Name="LatConclusionCard" Grid.Row="0" Background="#141C28" BorderBrush="#4CAF50" BorderThickness="1,0,0,0" CornerRadius="6" Padding="12,10" Margin="0,0,0,10">
+                        <Border x:Name="LatConclusionCard" Grid.Row="0" Background="#141C28" BorderBrush="{DynamicResource SuccessBrush}" BorderThickness="1,0,0,0" CornerRadius="6" Padding="12,10" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock x:Name="LatConclusionTitle" Text="O que o Kit está vendo" FontSize="12" FontWeight="Bold" Foreground="#4CAF50" Margin="0,0,0,5"/>
+                                <TextBlock x:Name="LatConclusionTitle" Text="O que o Kit está vendo" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" Margin="0,0,0,5"/>
                                 <TextBlock x:Name="LatConclusionText" Text="Clique em INICIAR e deixe rodar alguns minutos. A análise aparece aqui — igual ao LatencyMon, mas em português." FontSize="12" Foreground="#DDD" TextWrapping="Wrap" LineHeight="18"/>
                             </StackPanel>
                         </Border>
@@ -2898,10 +2898,10 @@
                             <!-- ÁUDIO: o Kit ouve o que o dispositivo está TOCANDO e pergunta ao
                                  próprio motor de áudio do Windows quando ele precisou pular
                                  quadros. Não é estimativa: é a API oficial de glitch (Win7+). -->
-                            <Border x:Name="LatAudioCard" Background="#141C28" BorderBrush="#4CAF50" BorderThickness="1,0,0,0" CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
+                            <Border x:Name="LatAudioCard" Background="#141C28" BorderBrush="{DynamicResource SuccessBrush}" BorderThickness="1,0,0,0" CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Estalos e travadas de áudio" FontSize="12" FontWeight="Bold" Foreground="#4CAF50" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Estalos e travadas de áudio" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
                                         <Border x:Name="LatAudioBadge" Style="{StaticResource TmBadge}" Margin="8,0,0,0" VerticalAlignment="Center">
                                             <TextBlock x:Name="LatAudioBadgeText" Text="DESLIGADO" FontSize="9" FontWeight="Bold" Foreground="#AAA"/>
                                         </Border>
@@ -2936,25 +2936,25 @@
                                     <TextBlock Text="Maior DPC de um driver (0–5 ms)" FontSize="10" Foreground="#999"/>
                                     <TextBlock x:Name="LatBarDpcVal" Text="—" FontSize="11" Foreground="White" FontWeight="SemiBold"/>
                                     <Border Background="#0D131A" CornerRadius="3" Height="9" HorizontalAlignment="Stretch" Margin="0,3,0,9">
-                                        <Border x:Name="LatBarDpc" Background="#4CAF50" CornerRadius="3" Height="9" HorizontalAlignment="Left" Width="2"/>
+                                        <Border x:Name="LatBarDpc" Background="{DynamicResource SuccessBrush}" CornerRadius="3" Height="9" HorizontalAlignment="Left" Width="2"/>
                                     </Border>
 
                                     <TextBlock Text="Maior ISR de um driver (0–5 ms)" FontSize="10" Foreground="#999"/>
                                     <TextBlock x:Name="LatBarIsrVal" Text="—" FontSize="11" Foreground="White" FontWeight="SemiBold"/>
                                     <Border Background="#0D131A" CornerRadius="3" Height="9" HorizontalAlignment="Stretch" Margin="0,3,0,9">
-                                        <Border x:Name="LatBarIsr" Background="#4CAF50" CornerRadius="3" Height="9" HorizontalAlignment="Left" Width="2"/>
+                                        <Border x:Name="LatBarIsr" Background="{DynamicResource SuccessBrush}" CornerRadius="3" Height="9" HorizontalAlignment="Left" Width="2"/>
                                     </Border>
 
                                     <TextBlock Text="Pior travada do sistema (0–10 s)" FontSize="10" Foreground="#999"/>
                                     <TextBlock x:Name="LatBarStallVal" Text="—" FontSize="11" Foreground="White" FontWeight="SemiBold"/>
                                     <Border Background="#0D131A" CornerRadius="3" Height="9" HorizontalAlignment="Stretch" Margin="0,3,0,9">
-                                        <Border x:Name="LatBarStall" Background="#4CAF50" CornerRadius="3" Height="9" HorizontalAlignment="Left" Width="2"/>
+                                        <Border x:Name="LatBarStall" Background="{DynamicResource SuccessBrush}" CornerRadius="3" Height="9" HorizontalAlignment="Left" Width="2"/>
                                     </Border>
 
                                     <TextBlock Text="Paginação do disco (0–2000 /s; verde se RAM de sobra)" FontSize="10" Foreground="#999"/>
                                     <TextBlock x:Name="LatBarHfVal" Text="—" FontSize="11" Foreground="White" FontWeight="SemiBold"/>
                                     <Border Background="#0D131A" CornerRadius="3" Height="9" HorizontalAlignment="Stretch" Margin="0,3,0,0">
-                                        <Border x:Name="LatBarHf" Background="#4CAF50" CornerRadius="3" Height="9" HorizontalAlignment="Left" Width="2"/>
+                                        <Border x:Name="LatBarHf" Background="{DynamicResource SuccessBrush}" CornerRadius="3" Height="9" HorizontalAlignment="Left" Width="2"/>
                                     </Border>
                                 </StackPanel>
                             </Border>
@@ -2967,14 +2967,14 @@
                                     <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0"><Run Foreground="#4FC3F7" FontWeight="Bold">Paginação</Run> — quando falta RAM, o Windows busca no disco. Cada busca congela o programa que pediu.</TextBlock>
                                     <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0"><Run Foreground="#4FC3F7" FontWeight="Bold">Janela travada</Run> — aquele "Não respondendo". O Kit marca quando começou, quanto durou e em qual programa.</TextBlock>
                                     <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0"><Run Foreground="#4FC3F7" FontWeight="Bold">Sistema travado</Run> — se TODOS os programas pararem juntos, o Kit registra e mostra o horário exato.</TextBlock>
-                                    <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0"><Run Foreground="#4CAF50" FontWeight="Bold">Estalo de áudio</Run> — o motor de áudio do Windows avisa quando precisou pular quadros. O Kit mostra quanto áudio se perdeu, o que estava tocando e o que o sistema fazia no mesmo instante.</TextBlock>
+                                    <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0"><Run Foreground="{DynamicResource SuccessBrush}" FontWeight="Bold">Estalo de áudio</Run> — o motor de áudio do Windows avisa quando precisou pular quadros. O Kit mostra quanto áudio se perdeu, o que estava tocando e o que o sistema fazia no mesmo instante.</TextBlock>
                                 </StackPanel>
                             </Border>
 
                             <Border Background="#141C28" BorderBrush="#1F2A3A" BorderThickness="1" CornerRadius="8" Padding="12,10">
                                 <StackPanel>
                                     <TextBlock Text="Como ler" Style="{StaticResource TmSectionHeader}" Margin="0,0,0,6"/>
-                                    <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17"><Run Foreground="#4CAF50" FontWeight="Bold">Verde</Run> = saudável. <Run Foreground="#FFB74D" FontWeight="Bold">Laranja</Run> = atenção. <Run Foreground="#F44336" FontWeight="Bold">Vermelho</Run> = está causando travamento agora.</TextBlock>
+                                    <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17"><Run Foreground="{DynamicResource SuccessBrush}" FontWeight="Bold">Verde</Run> = saudável. <Run Foreground="#FFB74D" FontWeight="Bold">Laranja</Run> = atenção. <Run Foreground="#F44336" FontWeight="Bold">Vermelho</Run> = está causando travamento agora.</TextBlock>
                                     <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0">Clique numa linha de <Run FontWeight="Bold">Eventos</Run> e passe o mouse: a explicação completa (o que significa e o que fazer) aparece no tooltip.</TextBlock>
                                     <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0">O nome do <Run FontWeight="Bold">driver</Run> exato só aparece com o Kit como administrador. Sem admin, o Kit continua medindo — só não sabe dizer o arquivo.</TextBlock>
                                     <TextBlock Text="Dica: deixe rodando enquanto o problema acontece. Depois clique em 'Copiar relatório (IA)'." FontSize="11" Foreground="#4FC3F7" TextWrapping="Wrap" LineHeight="17" Margin="0,9,0,0"/>
@@ -3051,7 +3051,7 @@
                             </StackPanel>
                             <StackPanel Grid.Column="1">
                                 <TextBlock Text="ATIVIDADE" FontSize="9" Foreground="#888"/>
-                                <TextBlock x:Name="StActivity" Text="—" FontSize="17" FontWeight="Bold" Foreground="#4CAF50"/>
+                                <TextBlock x:Name="StActivity" Text="—" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}"/>
                                 <TextBlock x:Name="StActivityHint" Text="tempo ocupado" FontSize="9" Foreground="#666"/>
                             </StackPanel>
                             <StackPanel Grid.Column="2">
@@ -3171,12 +3171,12 @@
                         <StackPanel>
 
                             <!-- DIAGNÓSTICO -->
-                            <Border x:Name="StDiagCard" Background="#141C28" BorderBrush="#4CAF50" BorderThickness="1,0,0,0" CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
+                            <Border x:Name="StDiagCard" Background="#141C28" BorderBrush="{DynamicResource SuccessBrush}" BorderThickness="1,0,0,0" CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock x:Name="StDiagTitle" Text="Diagnóstico" FontSize="12" FontWeight="Bold" Foreground="#4CAF50" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="StDiagTitle" Text="Diagnóstico" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
                                         <Border x:Name="StDiagBadge" Background="#243024" CornerRadius="3" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
-                                            <TextBlock x:Name="StDiagBadgeText" Text="AGUARDANDO" FontSize="9" FontWeight="Bold" Foreground="#4CAF50"/>
+                                            <TextBlock x:Name="StDiagBadgeText" Text="AGUARDANDO" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}"/>
                                         </Border>
                                     </StackPanel>
                                     <TextBlock x:Name="StDiagText" Text="Clique em ESCUTAR. O Kit mede o disco e mostra quem está fazendo E/S. Nada é dado como causa sem teste." FontSize="11" Foreground="#DDD" TextWrapping="Wrap" LineHeight="17" Margin="0,6,0,0"/>
@@ -3240,7 +3240,7 @@
                                     <TextBlock Text="Fato, hipótese e prova" Style="{StaticResource TmSectionHeader}" Margin="0,0,0,6"/>
                                     <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17"><Run Foreground="#4FC3F7" FontWeight="Bold">FATO</Run> — o disco está ocupado X%, com fila e latência medidas.</TextBlock>
                                     <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0"><Run Foreground="#FFB74D" FontWeight="Bold">HIPÓTESE</Run> — quem mais transferiu bytes. Estar no topo NÃO prova culpa: muitos programas pequenos somados podem pesar mais que um grande.</TextBlock>
-                                    <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0"><Run Foreground="#4CAF50" FontWeight="Bold">PROVA</Run> — o teste de impacto: com o processo suspenso, o disco ficou livre? Se sim, a correlação é real. Se não, o Kit diz que ele NÃO é o culpado.</TextBlock>
+                                    <TextBlock FontSize="11" Foreground="#BBB" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0"><Run Foreground="{DynamicResource SuccessBrush}" FontWeight="Bold">PROVA</Run> — o teste de impacto: com o processo suspenso, o disco ficou livre? Se sim, a correlação é real. Se não, o Kit diz que ele NÃO é o culpado.</TextBlock>
                                 </StackPanel>
                             </Border>
 

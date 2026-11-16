@@ -44,14 +44,14 @@
             </Grid.ColumnDefinitions>
 
             <!-- COLUNA ESQUERDA (Menu) -->
-            <Border Background="#121212" CornerRadius="8" Margin="0,0,20,0" BorderBrush="#333" BorderThickness="1" Style="{StaticResource CardStyle}">
+            <Border Background="#121212" CornerRadius="8" Margin="0,0,20,0" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Style="{StaticResource CardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <Border BorderBrush="#333" BorderThickness="0,0,0,1" Padding="15">
+                    <Border BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1" Padding="15">
                         <TextBlock Text="CATEGORIAS" Foreground="#777" FontWeight="Bold" FontSize="12"/>
                     </Border>
 
@@ -70,7 +70,7 @@
                                             <Border x:Name="bdr" Background="Transparent" CornerRadius="6">
                                                 <Grid>
                                                     <Rectangle x:Name="Indicator" Width="4" HorizontalAlignment="Left" RadiusX="2" RadiusY="2"
-                                                               Fill="{StaticResource AccentColor}" Visibility="Collapsed" Height="20"/>
+                                                               Fill="{DynamicResource AccentColor}" Visibility="Collapsed" Height="20"/>
                                                     <ContentPresenter Margin="{TemplateBinding Padding}"/>
                                                 </Grid>
                                             </Border>
@@ -155,8 +155,8 @@
                                     HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
-                                        <Border x:Name="cardBorder" Background="{StaticResource CardBackground}" 
-                                                BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8"
+                                        <Border x:Name="cardBorder" Background="{DynamicResource CardBackground}" 
+                                                BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8"
                                                 Padding="15">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
@@ -218,8 +218,8 @@
                                         <!-- TRIGGERS -->
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="cardBorder" Property="Background" Value="{StaticResource CardHover}"/>
-                                                <Setter TargetName="cardBorder" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                                <Setter TargetName="cardBorder" Property="Background" Value="{DynamicResource CardHover}"/>
+                                                <Setter TargetName="cardBorder" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
                                                 <Setter TargetName="cardBorder" Property="Effect">
                                                     <Setter.Value>
                                                         <DropShadowEffect Color="#FFD700" BlurRadius="12" ShadowDepth="0" Opacity="0.15"/>

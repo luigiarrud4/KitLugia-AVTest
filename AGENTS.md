@@ -1,5 +1,169 @@
 ﻿> **NOTA (12/11/2026):** Este projeto foi movido para `C:\Users\Lugia\KitLugia`. Referencias a `KitLugia-master - Copia` ou `Downloads` neste arquivo sao historicas.
 
+# Sessao 16/11 - Launcher/bootstrapper: instalar o .NET faltando na propria tela (estilo LuaTools)
+
+> **STATUS FINAL: REVERTIDO por decisao do usuario (16/11, 17:45).** O release voltou ao
+> esquema antigo: **sem launcher, sem tela de instalacao — o usuario instala o .NET
+> manualmente** (dialogo nativo do .NET). O CODIGO do launcher continua no repo
+> (`KitLugia.Bootstrap/`) e esta tudo documentado em **`docs/LAUNCHER_BOOTSTRAP.md`**
+> (o que foi feito, as telas, e o passo a passo para reativar).
+> O que FICOU no core: `KitLugia.Core/AppPaths.cs` (fonte unica do nome dos executaveis),
+> que e' neutro com o layout antigo e deixa o launcher pronto para reativacao.
+
+Pedido: "sabe a tela de quando alguem nao tem o .net instalado aparece? no kit ele so manda para a
+pagina de download mas seria bom ele ja baixar e instalar ali mesmo igual ao luatools" (print do
+LuaTools: "Instalacao do LuaTools / Componentes Adicionais Necessarios / .NET 8.0.0 X64 /
+[Deseja baixa-los e instala-los agora?] [Cancelar] [Instalar]").
+
+**O PROBLEMA REAL (medido):** o app principal e' `net10.0-windows` **framework-dependent**
+(`KitLugia.GUI.csproj`, sem `SelfContained`; `Deploy.ps1` publica com `-p:SelfContained=false`).
+Numa maquina SEM o .NET Desktop Runtime 10 o app **NAO ABRE NENHUMA TELA**: o apphost do .NET
+mostra "voce precisa instalar o .NET Desktop Runtime" e manda o usuario para a pagina de download
+no navegador. Consequencia: **a tela do Kit NAO pode ser a que resolve isso** — o WPF nem carrega.
+Por isso a solucao nao e' um dialogo dentro do app, e' um **launcher antes do app**.
+
+**1. NOVO PROJETO `KitLugia.Bootstrap/` (net48 WPF, 55 KB)** — launcher/bootstrapper:
+- **Por que net48**: o .NET Framework 4.8 ja vem no Windows 10/11 (targeting pack 4.8 presente na
+  maquina, build offline sem NuGet). Ele roda SEMPRE, mesmo sem o .NET 10 — que e' exatamente o
+  cenario que precisamos cobrir. `app.manifest` = `asInvoker` (o UAC fica para o instalador
+  oficial da Microsoft e para o app principal, que exige admin).
+- `ComponentDetector`: **.NET Desktop Runtime x64 (major 10)** com **3 fontes** — registro de
+  instalacao do .NET, `dotnet --list-runtimes` (pega DOTNET_ROOT/instalacao nao-padrao) e varredura
+  de `%ProgramFiles%\dotnet\shared`; + **Visual C++ 2015-2022 x64** (registro
+  `HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64`). So' lista o que FALTA.
+- `ComponentInstaller`: baixa de URL **oficial** (`aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe`
+  -> fallback `builds.dotnet.microsoft.com/...`; `aka.ms/vs/17/release/vc_redist.x64.exe`) com
+  **progresso real** (Content-Length), valida o arquivo (tamanho + cabecalho `MZ`), e executa o
+  instalador com `/install /quiet /norestart` (o proprio instalador pede o UAC). Codigo de saida
+  **0 ou 3010** = sucesso.
+- `DependencyDialogView`/`DependencyDialogWindow`: a tela "Componentes Adicionais Necesarios" no
+  **visual do Kit** (Surface0 #0F0F0F, dourado #FFD700, gradiente `GoldGradient`, triangulo de
+  aviso igual ao `LugiaMsgBox`, titulo "INSTALACAO DO KITLUGIA") com a lista dos componentes
+  faltantes, barra de progresso + percentual + status ("Baixando..."/"Instalando...") e os botoes
+  **Cancelar / Instalar**. So' depois de instalar e verificar e' que o Kit e' aberto.
+
+**2. INTEGRACAO**:
+- `KitLugia.sln`: projeto adicionado.
+- `Deploy.ps1`: novo passo `[2b/4]` publica o launcher junto com o GUI (release passa a ter
+  `KitLugia.exe` = launcher + `KitLugia.App.exe` = app). O usuario clica em **`KitLugia.exe`**.
+- **UM SO EXE VISIVEL**: o app publicado foi renomeado (SO' o ARQUIVO; o assembly continua
+  "KitLugia.GUI", entao os `pack://` do XAML nao mudam) para `KitLugia.App.exe` — sem isso a
+  pasta de release tinha dois exes parecidos (`KitLugia.exe` e `KitLugia.GUI.exe`) e o usuario
+  podia clicar no errado (e voltar ao erro do apphost). Fonte unica de verdade:
+  **`KitLugia.Core/AppPaths.cs`** (`LauncherExeFileName`, `AppExeFileName`,
+  `LegacyAppExeFileName`, `ResolveAppExePath`, `GetAppExePathForRegistration`) — menu de
+  contexto (SystemTweaks x3), auto-fix do menu (TrayIconService), updater (GitHubUpdater +
+  UpdatePage), ISO (IsoEditorPage) e WinPE (WinbootManager: o nome do exe e' INJETADO no
+  script em vez de chumbado). O launcher tem a MESMA ordem de resolucao (App -> legado ->
+  qualquer KitLugia*.exe que nao seja o launcher).
+- `COMO ABRIR O KITLUGIA.txt` no release: extrair -> clicar em KitLugia.exe.
+- `TrayIconService.GetAutoStartTargetPath()` (NOVO): o **auto-start passa a apontar para o
+  launcher** quando ele existe ao lado do app. Sem isso, numa maquina sem runtime o boot
+  estouraria o dialogo do apphost do .NET a cada inicializacao; com o launcher, em modo `--tray`
+  ele sai em **silencio** (so' log). `SetAutoStart`/`AutoStartAlreadyUpToDate`/
+  `IsAutoStartEnabled`/`CleanupOldTask`/`LogAutoStartDiagnostics` usam o helper.
+- `App.xaml.cs` + `DotNetDirectInstaller`: o check interno passou a exigir **major 10**
+  (antes aceitava "8 instalado" e engolia o aviso — o app e' net10, o runtime 8/9 NAO o roda);
+  `IsDesktopRuntimeInstalled` ganhou o **3o fallback** (pasta) para nao dar falso ausente.
+
+**3. VERIFICACAO (medida)**:
+- Build solucao: **0 erros** (171 avisos nullable — nenhum nos arquivos tocados).
+- `--selftest`: ".NET Desktop 10 x64 : INSTALADO", "Visual C++ 2015-2022 x64 : INSTALADO",
+  "Componentes ausentes : (nenhum)" (nesta maquina).
+- **Download real**: 57 MB baixados do `aka.ms` com progresso (98/99/100%) — OK.
+- **Instalacao (prova sem UAC)**: `--install-dryrun` roda o MESMO `ComponentInstaller.Install`
+  contra um instalador stand-in -> "OK" (cobre processo -> espera -> codigo de saida).
+- **Lancamento**: launcher sem componentes faltando abre `KitLugia.GUI.exe` **repassando os
+  argumentos** (log: `Abrindo o KitLugia: ... --tray --unlock "C:\...\pasta com espaco"` —
+  as aspas vem do `Quote()`, path com espaco chega inteiro).
+- **Visual**: `--shot` renderiza a tela OFF-SCREEN (`RenderTargetBitmap`) em
+  `shots/bootstrap/bootstrap-dialog.png` e `bootstrap-progress.png` — conferidas a olho.
+- **JANELA REAL**: `--simulate-missing` (forca o estado "faltando", so' para QA) abre a janela de
+  verdade; capturada via `PrintWindow(hwnd, PW_RENDERFULLCONTENT)` ->
+  `shots/bootstrap/bootstrap-real-window.png` (596x494, brilho dourado **sem corte** — por isso a
+  Window tem 28 px de folga em volta do conteudo, e nao a largura exata da view).
+- `ui_style_audit --check`: **saida 0** (o audit so' olha `KitLugia.GUI\Pages`).
+- **RELEASE REAL**: `Deploy.ps1 -OutputDir out\_deploy_test` rodou de ponta a ponta (publish do app
+  single-file + rename + launcher + txt + ZIP + SHA256, 70,74 MB). Raiz do release medida:
+  `COMO ABRIR O KITLUGIA.txt` / `KitLugia.exe` (60 KB, launcher) / `KitLugia.App.exe` (54 MB, app) /
+  `KitLugia.exe.config` / 2 DLLs nativas + pastas `Resources/ Tools/ External/ amd64/ arm64/ x86/`.
+- **Launcher com o nome novo**: log `App gerenciado: ...\KitLugia.App.exe` +
+  `Abrindo o KitLugia: ...\KitLugia.App.exe --tray` (resolucao App -> legado -> qualquer
+  `KitLugia*.exe` que nao seja o launcher).
+
+**4. ESTUDO DO LUATOOLS (`C:\Users\Lugia\Downloads\LuaTools-main`) — como ELE faz:**
+- `src/LuaToolsGui/LuaToolsGui.csproj:5` — o GUI do LuaTools e' `net8.0-windows` **framework-dependent**,
+  igual ao KitLugia (nao e' self-contained).
+- `src/LuaToolsGui/Program.cs:18` — a PRIMEIRA linha do `Main` e' `VelopackApp.Build().Run()`: quem
+  cuida de install/update e' o **Velopack** (instalador NATIVO).
+- `README.md` (Requirements) — "the released installer bundles a check for the .NET 8 **Desktop
+  Runtime** and installs it if missing": o check/install do runtime acontece no **instalador**, nao
+  no app — porque o app, sem runtime, nem abre.
+- Assets da release do LuaTools: **`LuaTools-win-Setup.exe`** (instalador nativo = o "1 exe" que o
+  usuario baixa) **+ `LuaTools-win-Portable.zip`** (portatil). Ou seja: 2 artefatos, e o "1 exe"
+  do usuario e' o SETUP, nao o app.
+- `Services/SteamAutoCrackService.cs:120-155` — a **Runtimes API do Velopack** para instalar runtime
+  on-demand de ferramenta de terceiro: `GetRuntimeByName("net10-x64-desktop")` -> `CheckIsInstalled()`
+  -> `CheckIsSupported()` -> `DownloadToFile(progress)` -> `InvokeInstaller(...)` -> **3 estados**:
+  `InstallSuccess` / `UserCancelled` / `RestartRequired` (o ultimo = "instalado mas o Windows precisa
+  reiniciar", com texto proprio em `Strings.pt-BR.resx`).
+- A tela da imagem ("Instalacao do LuaTools / Componentes Adicionais Necessarios / .NET 8.0.0 X64")
+  **NAO esta neste repo** (nao ha um unico .lua aqui) — ela vem do plugin LuaTools do **Garry's Mod**
+  (lado Lua), que e' quem roda dentro do GMod e precisa do .NET 8 para as ferramentas GUI.
+- **CONCLUSAO**: o "truque" do LuaTools nao e' um flag `--netframework` (impossivel: o apphost falha
+  antes de qualquer codigo managed) e' o **instalador NATIVO** (Velopack) que roda antes do app. O
+  equivalente fiel para o KitLugia = um `KitLugia-Setup.exe` (instalador) + o `KITLUGIA2.zip`
+  portatil, com o launcher (net48) fazendo o papel do bootstrapper do Velopack.
+
+**5. ESTADOS DE INSTALACAO (adotado do LuaTools)**: `ComponentInstaller.Install` agora devolve
+`InstallOutcome` (Success / UserCancelled / RestartRequired / Failed) em vez de bool: 0 = ok,
+3010 = "instalado, mas o Windows precisa reiniciar antes de o KitLugia abrir" (3010 NAO e mais
+"sucesso silencioso"), 1223 = "Cancelado pelo usuario".
+
+**6. DECISAO DO USUARIO (16/11, 15:12)**: NAO fazer um `Setup.exe` instalador separado.
+> "ah é um setup.exe separado? se for deixa do jeito que esta o kit pensei que o .net tinha uma coisa
+> que ele se auto instalava se necessario"
+
+O kit fica **ZIP + launcher ao lado do app** (o modelo "portátil" do LuaTools, que tambem publica
+`LuaTools-win-Portable.zip` ao lado do `Setup.exe`). O launcher (net48) JÁ E' o "auto-install" que
+o usuario esperava: ele verifica o .NET e instala ali mesmo, sem browser e sem passos manuais.
+O que o .NET faz sozinho (apphost) e' so mostrar o dialogo "voce precisa instalar o .NET" com o
+botao Download -> navegador -> pagina de download; a instalacao em si sempre e' um passo explicito
+(instalador oficial da Microsoft, Microsoft Store ou `winget install Microsoft.DotNet.Runtime.10`).
+Por isso o "auto-install" tem de ser um binario que rode SEM o .NET — no Kit, o launcher net48.
+
+**7. REVERT (16/11, 17:45) — o usuario testou a build e pediu para voltar ao esquema antigo:**
+> "deixe como era antes, testei achei legal mas nao e' bem o que eu esperava. pode salvar antes
+> num .md o que fez e, se quiser manter o codigo usado, so' volte ao esquema antigo que o
+> usuario instala manualmente o .net"
+
+- `git checkout` em `KitLugia.GUI/App.xaml.cs`, `KitLugia.GUI/Services/DotNetDirectInstaller.cs`
+  e `Deploy.ps1` (o diff desses 3 arquivos era 100% desta sessao — nao havia trabalho
+  anterior neles, entao o revert foi exato).
+- O release volta a ter UM exe so: `KitLugia.GUI.exe` (54 MB) + as 2 DLLs nativas. Sem
+  launcher, sem `COMO ABRIR O KITLUGIA.txt`, sem rename. O usuario clica no app e o
+  **dialogo nativo do .NET** aparece -> ele instala o .NET manualmente.
+- **FICOU NO REPO** (neutro com o layout antigo, launcher pronto para reativar):
+  `KitLugia.Bootstrap/` (10 arquivos, fora do release), `KitLugia.Core/AppPaths.cs`, o
+  projeto no `KitLugia.sln` (compila, 60 KB) e o refactor dos 8 pontos que usavam o nome
+  do exe chumbado (com o app em `KitLugia.GUI.exe` o helper resolve o mesmo caminho de
+  antes — auto-start aponta para o app, o WinPE injeta o mesmo nome, o updater nao apaga
+  nada porque o nome atual JA e' o "legacy").
+- Documentacao completa: **`docs/LAUNCHER_BOOTSTRAP.md`** (inclui os prints, o estudo do
+  LuaTools e o passo a passo de reativacao).
+
+**QUIRKS / ARMADILHAS**:
+- `StaticResource` entre dicionarios mesclados cai em `UnsetValue` (mesma armadilha da F0): por
+  isso as brushes do dialogo estao **inline** no `UserControl.Resources`, sem dicionario externo.
+- `Grid` nao tem `CornerRadius` (so' `Border`) — a barra de progresso e' um `Border`.
+- `UserControl` nao tem `SizeToContent` (so' `Window`) — quem dimensiona e' a Window.
+- Exe WinExe **nao** mostra console: o `--selftest`/`--shot` usa `AttachConsole(-1)` e grava
+  TAMBEM em `%LOCALAPPDATA%\KitLugia\bootstrap.log` (unico vestigio em maquina sem runtime).
+- `Process.Start` com `UseShellExecute=true` **nao** espera o exit code de um `.cmd` com
+  `CreateNoWindow`; o stand-in do dry-run roda como `.cmd` via ShellExecute (funciona).
+- O launcher precisa do **.NET Framework**, nao do .NET 10 — se o usuario desabilitar o .NET
+  Framework, o launcher tambem nao abre (o Kit inteiro depende dele nesse cenario).
+
 # Sessao 06/11 - GPU real vs virtual: filtro + refresh imediato + visual do ponto de restauracao
 
 Pedido: "faca o kit ignorar o virtual display driver e so focar na placa de video real";
@@ -12656,3 +12820,88 @@ AnimCheck 44/44; ui_style_audit SAIDA 0 (allowlist: AppsPage 116->117, SystemInf
 da tela em 72%; PNGs em `tests/RestorePointVis/shots/restorepoint`. Encodings: os
 pre-existentes mantiveram BOM/CRLF originais; os 2 arquivos novos do harness foram
 normalizados para BOM+CRLF (convencao UiShotHarness).
+
+# Sessao 13/11 - Indice MFT persistente + dedup de ComboBox (F-A extracao)
+
+**1. MFT persistente (rust_native/mft_index.rs, NOVO)**: scan do $MFT agora grava
+`%LOCALAPPDATA%\KitLugia\mftidx\<volume>.klmft` (~613 MB C:, ~51 MB D:) — serializacao
+do VolumeData (entries 32B + pool UTF-16). Freshness via USN Journal: query +
+FSCTL_READ_USN_JOURNAL le o delta; so' re-escaneia se a cadeia de pais de um
+registro alterado tocar um prefixo varrido (ancestors_hit_prefix). ReasonMask
+ignora DATA_OVERWRITE/CLOSE/SECURITY/EA/ENCRYPTION/OBJECT_ID/COMPRESSION/STREAM.
+Novo export `mft_scan_index_ffi`; NativeMft prefere com fallback p/ _ex.
+Verificado ao vivo: D: hitou indice (sem regravar), C: re-escaneou por churn real
+em AppData. Testes cargo: ancestors_hit + journal_delta (57 records reais).
+
+**2. Extracao F-A (docs/UI_EXTRACTION_PLAN.md, NOVO)**: auditoria WPF com 3
+subagentes — veredito: base boa (tokens, Cleanup 100%, startup lazy), divida =
+85% hex hardcoded, 12/23 text styles mortos, 11 DarkComboBoxStyle duplicadas,
+AppsPage.xaml.cs 4303 linhas. F-A executada: removidas DarkComboBoxStyle +
+templates ToggleButton duplicados de 12 paginas (Apps, Dashboard, DiskConverter,
+GameBoost, IsoEditor, Network, Partitions, ReinstallPreserve, TraySettings,
+Winboot, WindowsUpdate, ContextMenuManager) — combos agora usam o estilo
+implicito de Themes/ComboBox.xaml. ToolsPage preservada (template serve a
+outro style). Build 0 erros; UiShotHarness 5/5 OK.
+
+# Sessao 13/11 (cont.) - Extracao UI: F-B/F-C/F-E/F-F completas
+
+**F-B AreaLoadingOverlay (Controls/novo)**: contrato Variante A virou UserControl
+com DPs Message/Subtitle/Progress/AnimateMessage + Spinner p/ legado. Migradas
+AppsPage x3, BloatwarePage, ProgramsPage, SystemInfoPage, DriversPage (~15 sites
+de code-behind: TxtXxxProgress.Text -> Overlay.Progress). Puladas: ServicesPage
+(card proprio), DashboardPage benchmark (widget c/ console), IntegrityPage.
+Controls/LoadingOverlay antigo ficou orfao (0 usos) - nao removido.
+
+**F-C/F-D**: IsoEditorPage spinner inline -> Win11SpinnerTemplate. NetworkPage
+RowSpinnerStyle MANTIDO (micro-spinner 13px data-bound, nao loader). StoreRemake
+Page/Window inteiros PULADOS - tema azul #0078D4 e' identidade da Store remake
+(mesma regra do Tm* azul do TaskManager).
+
+**F-E ToolTip**: GameBoostPage + WinTunePage tinham impl. implicita identica;
+tema JA tinha a mesma em BaseStyles.xaml:30 - removidas as copias locais.
+CUIDADO: quase dupliquei (minha 1a versao colidiu: "Item has already been added
+ToolTip" quebrou Generic.xaml inteiro no UiShotHarness) - lição: grep de
+TargetType no tema deve cobrir {x:Type ...} alem da forma literal.
+
+**F-F triagem (2 subagentes)**: ~15 styles locais promovidos p/ Themes com mesma
+x:Key (StepCard, StatCard, SettingsCard, SearchResultCard, StatValue/Label,
+StutterButtonBase, SecButton, FlatIconButton, InfoButtonStyle, ProcessItemStyle,
+TrayToggle+AdvancedToggle, SearchChipStyle, DarkPlaceholderTextBoxStyle ex-
+DnsPlaceholderTextBoxStyle x2). Mantidos: WarningBoxStyle, StopServerButtonStyle
+(sem uso), ActionBtn, Dashboard InfoButtonStyle (variante 18px diferente),
+ToolsPage ComboBoxToggleButton (serve GoldComboBoxStyle).
+
+**Verificacao final**: build 0 erros; UiShotHarness 25/25 paginas tocadas OK;
+ui_style_audit SAIDA 0; hex hardcoded 2188->2054. PGFs em C:/kltmpbuild/
+uishot_extract. Doc: docs/UI_EXTRACTION_PLAN.md atualizado.
+
+**Quirk de ferramenta**: write/edit tools falharam silenciosamente em
+Controls/AreaLoadingOverlay.xaml.cs (revertiam p/ versao do subagente) -
+contornei escrevendo via PowerShell [IO.File]::WriteAllText. Se editar arquivos
+criados por subagente der ruim, usar shell.
+
+# Sessao 13/11 (cont.2) - DynamicResource + tokenizacao de hex
+
+**DynamicResource**: 978 refs `{StaticResource <brush-token>}` -> DynamicResource
+em 57 XAMLs (so' as 23 chaves de brush do tema: AccentColor, Surface0-2,
+BorderSubtle/Strong, TextPrimary/Secondary/Muted/Description/TextGold,
+Success/Error/WarningBrush, Notification*Brush, CardBackground/Border/Hover,
+SidebarBackground, WindowBackground, GoldGradient). Templates/styles FontSize
+etc. ficaram StaticResource de proposito.
+
+**Tokenizacao de hex (tokenize_hex.py, script novo na raiz)**: 3437 subs em 95
+XAMLs - so' matches EXATOS de cor (Background/Foreground/BorderBrush/Fill/
+Stroke/CaretBrush/SelectionBrush="#hex"): #FFD700->AccentColor, #1A1A1A->
+Surface1, #252525->Surface2, #0F0F0F->Surface0, #333/#333333->BorderSubtle,
+#555/#555555->BorderStrong, #8A8A8A/#888888->TextMuted, #A0A0A0->TextDescription,
+#4CAF50->SuccessBrush, #C42B1C->ErrorBrush, #FFC107->WarningBrush. Zero mudanca
+visual (mesma cor). Hex em Pages: 2054->1578; os ~1578 restantes sao cores sem
+token (azuis, cinzas fora da escala, variantes) - exigem decisao/token novo.
+
+**Verificacao**: build 0 erros (OutDir=C:/kltmpbuild - app do usuario rodando
+trava o exe de saida); UiShotHarness 7/7 + 25/25 anteriores; audit SAIDA 0.
+KitTaskManagerWindow teve 545 subs (mesmos valores, so' troca p/ token - se um
+dia houver tema claro, TM acompanha).
+
+**Sobre tema claro**: kit e' dark-only; DynamicResource+tokens sao o
+pre-requisito, mas o tema claro exige 2a paleta + toggle - fase separada.

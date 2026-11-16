@@ -9,7 +9,7 @@
         <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
 
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="Tweaks Avan&#xE7;ados (EXM)" Margin="0,0,0,10"/>
-            <TextBlock Text="Tweaks adicionais baseados no EXM Premium que n&#xE3;o est&#xE3;o no KitLugia padr&#xE3;o. Reinicializa&#xE7;&#xE3;o necess&#xE1;ria para a maioria." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+            <TextBlock Text="Tweaks adicionais baseados no EXM Premium que n&#xE3;o est&#xE3;o no KitLugia padr&#xE3;o. Reinicializa&#xE7;&#xE3;o necess&#xE1;ria para a maioria." Foreground="{DynamicResource TextDescription}" Margin="0,0,0,30"/>
 
             <Border Background="#2D2020" BorderBrush="#503030" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,20">
                 <StackPanel Orientation="Horizontal">
@@ -21,7 +21,7 @@
 
             <!-- ====== REDE / TCP/IP ====== -->
             <TextBlock Text="Rede e TCP/IP" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
                     <!-- TCP Initial RTO -->
@@ -36,7 +36,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Aumenta o RTO (Retransmission Timeout) inicial para 2000ms, melhorando a estabilidade em conex&#xF5;es com perda de pacotes. Padr&#xE3;o Windows: 3000ms."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -47,7 +47,7 @@
                         <CheckBox x:Name="ChkTcpInitialRto" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcpInitialRto_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- TCP NonBestEffortLimit -->
                     <Grid Margin="20">
@@ -61,7 +61,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define NonBestEffortLimit=0 para desabilitar a limita&#xE7;&#xE3;o de QoS. Permite que aplica&#xE7;&#xF5;es usem toda a largura de banda dispon&#xED;vel sem restri&#xE7;&#xF5;es."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -72,7 +72,7 @@
                         <CheckBox x:Name="ChkTcpNonBestEffort" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcpNonBestEffort_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- TCP DefaultTTL -->
                     <Grid Margin="20">
@@ -86,7 +86,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define o TTL (Time To Live) padr&#xE3;o para 64. Determina quantos saltos um pacote pode percorrer antes de ser descartado. 64 &#xE9; o valor ideal para a maioria das redes."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -97,7 +97,7 @@
                         <CheckBox x:Name="ChkTcpDefaultTtl" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcpDefaultTtl_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- TCP Timestamps + Window Scale -->
                     <Grid Margin="20">
@@ -111,7 +111,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Ativa TCP1323Opts=1 para habilitar Timestamps e Window Scaling. Melhora o throughput em conex&#xF5;es de alta lat&#xEA;ncia e longa dist&#xE2;ncia."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -122,7 +122,7 @@
                         <CheckBox x:Name="ChkTcp1323" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcp1323_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- TCP MaxDupAcks -->
                     <Grid Margin="20">
@@ -136,7 +136,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Reduz o threshold de ACK duplicado para 2 (padr&#xE3;o &#xE9; 3). Permite recupera&#xE7;&#xE3;o mais r&#xE1;pida de pacotes perdidos, melhorando a estabilidade em jogos online."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -147,7 +147,7 @@
                         <CheckBox x:Name="ChkTcpMaxDupAcks" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTcpMaxDupAcks_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Desativar WSD -->
                     <Grid Margin="20">
@@ -161,7 +161,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa Web Services Discovery (WSD) no TCP/IP. Reduz tr&#xE1;fego de descoberta de rede na LAN. Recomendado para jogos online."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -172,7 +172,7 @@
                         <CheckBox x:Name="ChkDisableWsd" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableWsd_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Desativar mDNS -->
                     <Grid Margin="20">
@@ -186,7 +186,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o servi&#xE7;o multicast DNS (mDNS). Reduz tr&#xE1;fego de descoberta de dispositivos na rede local. Pode afetar descoberta de Chromecast e AirPlay."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -197,7 +197,7 @@
                         <CheckBox x:Name="ChkDisableMdns" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableMdns_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Desativar LLTD -->
                     <Grid Margin="20">
@@ -211,7 +211,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o Link-Layer Topology Discovery (lltdsvc). Reduz tr&#xE1;fego de manuten&#xE7;&#xE3;o de mapa de rede. Recomendado para gamers."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -222,7 +222,7 @@
                         <CheckBox x:Name="ChkDisableLltd" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableLltd_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Desativar Bandwidth Throttle -->
                     <Grid Margin="20">
@@ -236,7 +236,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa a limita&#xE7;&#xE3;o de banda do LanmanWorkstation. Permite throughput m&#xE1;ximo em transfer&#xEA;ncias de rede SMB/CIFS."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -247,7 +247,7 @@
                         <CheckBox x:Name="ChkDisableBandwidthThrottle" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableBandwidthThrottle_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Limpar Cache de Rede -->
                     <Grid Margin="20">
@@ -261,7 +261,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Executa: netsh int ip delete arpcache/destinationcache/routecache/neighbors + ipconfig /flushdns /registerdns. Limpa todo o cache de rede do Windows."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -298,12 +298,12 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Habilita suporte a x2APIC no boot. Melhora o gerenciamento de interrup&#xE7;&#xF5;es em sistemas com muitos n&#xFA;cleos de CPU. Requer reinicializa&#xE7;&#xE3;o."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="x2APIC Policy (Enable)" FontSize="16" Foreground="White"/>
-                            <TextBlock Text="Habilita suporte a x2APIC para melhor gerenciamento de interrup&#xE7;&#xF5;es." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="Habilita suporte a x2APIC para melhor gerenciamento de interrup&#xE7;&#xF5;es." FontSize="12" Foreground="{DynamicResource TextDescription}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                         <TextBlock x:Name="StatusX2Apic" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkX2Apic" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkX2Apic_Click"/>
@@ -323,12 +323,12 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Aumenta o espa&#xE7;o de endere&#xE7;amento virtual de usu&#xE1;rio para 3072 MB (padr&#xE3;o 2048). Permite que aplica&#xE7;&#xF5;es usem mais mem&#xF3;ria virtual. Requer reinicializa&#xE7;&#xE3;o."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="IncreaseUserVa (3072)" FontSize="16" Foreground="White"/>
-                            <TextBlock Text="Aumenta espa&#xE7;o de endere&#xE7;o virtual de usu&#xE1;rio para 3072 MB." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="Aumenta espa&#xE7;o de endere&#xE7;o virtual de usu&#xE1;rio para 3072 MB." FontSize="12" Foreground="{DynamicResource TextDescription}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                         <TextBlock x:Name="StatusIncreaseUserVa" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkIncreaseUserVa" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkIncreaseUserVa_Click"/>
@@ -348,12 +348,12 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desliga o tick din&#xE2;mico do timer do sistema. For&#xE7;a timers mais consistentes, reduzindo micro-lat&#xEA;ncia. Requer reinicializa&#xE7;&#xE3;o."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="Desativar Dynamic Tick" FontSize="16" Foreground="White"/>
-                            <TextBlock Text="Desliga tick din&#xE2;mico do timer para lat&#xEA;ncia mais consistente." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="Desliga tick din&#xE2;mico do timer para lat&#xEA;ncia mais consistente." FontSize="12" Foreground="{DynamicResource TextDescription}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                         <TextBlock x:Name="StatusDisableDynamicTick" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkDisableDynamicTick" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableDynamicTick_Click"/>
@@ -373,12 +373,12 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa a entropia do TPM durante o boot. Pode acelerar a inicializa&#xE7;&#xE3;o do sistema em alguns hardwares. Requer reinicializa&#xE7;&#xE3;o."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="Desativar TPM Boot Entropy" FontSize="16" Foreground="White"/>
-                            <TextBlock Text="Desativa entropia TPM no boot para inicializa&#xE7;&#xE3;o mais r&#xE1;pida." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="Desativa entropia TPM no boot para inicializa&#xE7;&#xE3;o mais r&#xE1;pida." FontSize="12" Foreground="{DynamicResource TextDescription}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                         <TextBlock x:Name="StatusTpmBootEntropy" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkTpmBootEntropy" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTpmBootEntropy_Click"/>
@@ -398,12 +398,12 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define usephysicaldestination=No no BCD. Configura o modo de destino f&#xED;sico APIC. Pode melhorar lat&#xEA;ncia de interrup&#xE7;&#xF5;es em alguns sistemas."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="UsePhysicalDestination (No)" FontSize="16" Foreground="White"/>
-                            <TextBlock Text="For&#xE7;a APIC physical destination mode." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="For&#xE7;a APIC physical destination mode." FontSize="12" Foreground="{DynamicResource TextDescription}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                         <TextBlock x:Name="StatusUsePhysicalDest" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkUsePhysicalDest" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkUsePhysicalDest_Click"/>
@@ -423,12 +423,12 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define uselegacyapic=No no BCD. For&#xE7;a o uso de APIC moderno em vez de legacy. Melhora gerenciamento de interrup&#xE7;&#xF5;es em hardware moderno."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="UseLegacyAPIC (No)" FontSize="16" Foreground="White"/>
-                            <TextBlock Text="For&#xE7;a uso de APIC moderno (n&#xE3;o legacy)." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="For&#xE7;a uso de APIC moderno (n&#xE3;o legacy)." FontSize="12" Foreground="{DynamicResource TextDescription}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                         <TextBlock x:Name="StatusUseLegacyApic" Text="Verificando..." Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
                         <CheckBox x:Name="ChkUseLegacyApic" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkUseLegacyApic_Click"/>
@@ -438,7 +438,7 @@
 
             <!-- ====== SERVIÇOS ADICIONAIS ====== -->
             <TextBlock Text="Servi&#xE7;os Adicionais" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
                     <!-- License Manager -->
@@ -453,7 +453,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o servi&#xE7;o LicenseManager (Start=4). Gerencia licen&#xE7;as da Windows Store. Desativar economiza recursos sem impacto percept&#xED;vel."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -464,7 +464,7 @@
                         <CheckBox x:Name="ChkDisableLicenseManager" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableLicenseManager_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- wlidsvc -->
                     <Grid Margin="20">
@@ -478,7 +478,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o servi&#xE7;o wlidsvc (Microsoft Account Sign-In Assistant). Economiza recursos se voc&#xEA; usa conta local."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -489,7 +489,7 @@
                         <CheckBox x:Name="ChkDisableWlidsvc" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableWlidsvc_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- shpamsvc -->
                     <Grid Margin="20">
@@ -503,7 +503,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o servi&#xE7;o shpamsvc (Shared PC Account Manager). Servi&#xE7;o para PCs compartilhados, desnecess&#xE1;rio em uso pessoal."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -514,7 +514,7 @@
                         <CheckBox x:Name="ChkDisableShpamsvc" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableShpamsvc_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Tablet/Touch -->
                     <Grid Margin="20">
@@ -528,7 +528,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa TabletInputService e TouchKeyboard. Economiza recursos em desktops sem tela touch. Recomendado para gamers."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -543,7 +543,7 @@
 
             <!-- ====== WINDOWS SETTINGS / VISUAL ====== -->
             <TextBlock Text="Windows Settings e Visual" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
                     <!-- Lock Screen -->
@@ -558,7 +558,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Remove a tela de bloqueio do Windows. Vai direto para a tela de login. Requer pol&#xED;tica de grupo ou registro HKLM."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -569,7 +569,7 @@
                         <CheckBox x:Name="ChkDisableLockScreen" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableLockScreen_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Toast -->
                     <Grid Margin="20">
@@ -583,7 +583,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Remove todas as notifica&#xE7;&#xF5;es toast do sistema e desativa o centro de notifica&#xE7;&#xF5;es. Recomendado para jogos em tela cheia."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -594,7 +594,7 @@
                         <CheckBox x:Name="ChkDisableToast" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableToast_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Clipboard -->
                     <Grid Margin="20">
@@ -608,7 +608,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o hist&#xF3;rico de clipboard e sua sincroniza&#xE7;&#xE3;o entre dispositivos. Economiza recursos e aumenta privacidade."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -619,7 +619,7 @@
                         <CheckBox x:Name="ChkDisableClipboard" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableClipboard_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Auto-Install -->
                     <Grid Margin="20">
@@ -633,7 +633,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Impede que a Windows Store reinstale automaticamente apps ap&#xF3;s atualiza&#xE7;&#xF5;es. Configura AutoDownload=2."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -644,7 +644,7 @@
                         <CheckBox x:Name="ChkDisableAutoInstall" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableAutoInstall_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Biometria -->
                     <Grid Margin="20">
@@ -658,7 +658,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o Windows Biometric Service (WbioSrvc). Desliga impress&#xE3;o digital e reconhecimento facial. Economiza recursos."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -669,7 +669,7 @@
                         <CheckBox x:Name="ChkDisableBiometrics" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableBiometrics_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Sensores -->
                     <Grid Margin="20">
@@ -683,7 +683,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o servi&#xE7;o de sensores (SensorService). Desliga sensores de luz ambiente, proximidade, etc. Economiza recursos."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -694,7 +694,7 @@
                         <CheckBox x:Name="ChkDisableSensors" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableSensors_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Visual FX -->
                     <Grid Margin="20">
@@ -708,7 +708,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desliga composi&#xE7;&#xE3;o Aero, arrastar janelas completas e scroll suave. Aplica VisualFXSetting=2 para m&#xE1;ximo desempenho visual."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -719,7 +719,7 @@
                         <CheckBox x:Name="ChkDisableVisualAnimations" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableVisualAnimations_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Menu Kill -->
                     <Grid Margin="20">
@@ -733,7 +733,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define AutoEndTasks=1, HungAppTimeout=1000ms, WaitToKillAppTimeout=2000ms, MenuShowDelay=0. Acelera shutdown e menus."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -744,7 +744,7 @@
                         <CheckBox x:Name="ChkKillMenu" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkKillMenu_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Task View -->
                     <Grid Margin="20">
@@ -758,7 +758,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Remove o bot&#xE3;o 'Task View' (Linha do Tempo) da barra de tarefas. Economiza espa&#xE7;o e reduz distra&#xE7;&#xF5;es."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -769,7 +769,7 @@
                         <CheckBox x:Name="ChkHideTaskView" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkHideTaskView_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Mica -->
                     <Grid Margin="20">
@@ -783,7 +783,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desliga os efeitos Mica e de transpar&#xEA;ncia no Windows 11. Melhora performance em GPUs integradas."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -794,7 +794,7 @@
                         <CheckBox x:Name="ChkDisableMica" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableMica_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Snap Assist -->
                     <Grid Margin="20">
@@ -808,7 +808,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desabilita Snap Assist e Snap Layouts no Windows 11. Recomendado para quem n&#xE3;o usa e quer reduzir overhead."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -823,7 +823,7 @@
 
             <!-- ====== MOUSE / TECLADO ====== -->
             <TextBlock Text="Mouse e Teclado" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
                     <!-- Mouse Accel -->
@@ -838,7 +838,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define MouseSpeed=0, MouseThreshold1/2=0. Remove acelera&#xE7;&#xE3;o do mouse para movimentos mais previs&#xED;veis em jogos."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -849,7 +849,7 @@
                         <CheckBox x:Name="ChkMouseAccel" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkMouseAccel_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Keyboard -->
                     <Grid Margin="20">
@@ -863,7 +863,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define KeyboardSpeed=31 (m&#xE1;ximo) e KeyboardDelay=0. Resposta mais r&#xE1;pida do teclado em jogos e digita&#xE7;&#xE3;o."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -874,7 +874,7 @@
                         <CheckBox x:Name="ChkKeyboard" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkKeyboard_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Cursor Suppression -->
                     <Grid Margin="20">
@@ -888,7 +888,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa EnableCursorSuppression. O cursor n&#xE3;o desaparece ao digitar no teclado. &#xDA;til para streaming e grava&#xE7;&#xE3;o."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -903,7 +903,7 @@
 
             <!-- ====== BOOT / CRASH ====== -->
             <TextBlock Text="Boot e Crash" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
                     <!-- Minidumps -->
@@ -918,7 +918,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define CrashDumpEnabled=0. Desliga a cria&#xE7;&#xE3;o de arquivos de minidump em caso de blue screen. Economiza espa&#xE7;o em disco."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -929,7 +929,7 @@
                         <CheckBox x:Name="ChkDisableMinidumps" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableMinidumps_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- AutoReboot Crash -->
                     <Grid Margin="20">
@@ -943,7 +943,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define AutoReboot=0. Impede que o Windows reinicie automaticamente ap&#xF3;s um blue screen, permitindo ver o erro."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -954,7 +954,7 @@
                         <CheckBox x:Name="ChkDisableAutoRebootCrash" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableAutoRebootCrash_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Zero Startup Delay -->
                     <Grid Margin="20">
@@ -968,7 +968,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define StartupDelayInMSec=0. Remove o atraso de inicializa&#xE7;&#xE3;o do Explorer. Acelera a &#xE1;rea de trabalho ao fazer login."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -979,7 +979,7 @@
                         <CheckBox x:Name="ChkZeroStartupDelay" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkZeroStartupDelay_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Boot Animation -->
                     <Grid Margin="20">
@@ -993,7 +993,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define EnableMachineBootAnimation=0. Remove a anima&#xE7;&#xE3;o de boot do Windows. Pode acelerar a inicializa&#xE7;&#xE3;o em SSDs."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1008,7 +1008,7 @@
 
             <!-- ====== STORAGE / MANUTENÇÃO ====== -->
             <TextBlock Text="Manuten&#xE7;&#xE3;o e Limpeza" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
                     <!-- WU Cache -->
@@ -1023,7 +1023,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Remove todos os arquivos da pasta SoftwareDistribution/Download. Libera espa&#xE7;o em disco sem afetar updates futuros."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1034,7 +1034,7 @@
                         <Button x:Name="BtnCleanWuCache" Grid.Column="3" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnCleanWuCache_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Recent Items -->
                     <Grid Margin="20">
@@ -1048,7 +1048,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Remove a lista de arquivos recentes do usu&#xE1;rio (pasta Recent). Libera espa&#xE7;o e limpa hist&#xF3;rico de atividade."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1059,7 +1059,7 @@
                         <Button x:Name="BtnCleanRecent" Grid.Column="3" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnCleanRecent_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- IE Cache -->
                     <Grid Margin="20">
@@ -1073,7 +1073,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Remove todo o cache do Internet Explorer e Edge legado (INetCache). Pode liberar GBs de espa&#xE7;o."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1084,7 +1084,7 @@
                         <Button x:Name="BtnCleanIeCache" Grid.Column="3" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnCleanIeCache_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Dumps/Logs -->
                     <Grid Margin="20">
@@ -1098,7 +1098,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Remove Minidumps, Windows Logs e WER (Windows Error Reporting) Reports. Libera espa&#xE7;o sem impacto no sistema."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1109,7 +1109,7 @@
                         <Button x:Name="BtnCleanDumpsLogs" Grid.Column="3" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnCleanDumpsLogs_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- SFC -->
                     <Grid Margin="20">
@@ -1123,7 +1123,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Executa sfc /scannow. Verifica e repara arquivos protegidos do Windows. Pode levar at&#xE9; 15 minutos. Requer administrador."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1133,11 +1133,11 @@
                         <TextBlock x:Name="StatusSfcScan" Text="Parado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
                         <StackPanel Grid.Column="3" Orientation="Vertical" HorizontalAlignment="Right">
                             <Button x:Name="BtnSfcScan" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnSfcScan_Click"/>
-                            <ProgressBar x:Name="ProgressSfc" Height="3" Width="75" Margin="0,4,0,0" Minimum="0" Maximum="100" Visibility="Collapsed" Foreground="#FFD700" Background="#333333"/>
+                            <ProgressBar x:Name="ProgressSfc" Height="3" Width="75" Margin="0,4,0,0" Minimum="0" Maximum="100" Visibility="Collapsed" Foreground="{DynamicResource AccentColor}" Background="{DynamicResource BorderSubtle}"/>
                         </StackPanel>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- DISM -->
                     <Grid Margin="20">
@@ -1151,7 +1151,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Executa DISM /RestoreHealth + /StartComponentCleanup /ResetBase. Repara imagem do sistema e limpa WinSxS. Pode levar at&#xE9; 30 minutos."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1161,7 +1161,7 @@
                         <TextBlock x:Name="StatusDism" Text="Parado" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,20,0" Foreground="Gray" FontWeight="SemiBold"/>
                         <StackPanel Grid.Column="3" Orientation="Vertical" HorizontalAlignment="Right">
                             <Button x:Name="BtnDism" Content="Executar" Style="{StaticResource ActionButtonStyle}" Click="BtnDism_Click"/>
-                            <ProgressBar x:Name="ProgressDism" Height="3" Width="75" Margin="0,4,0,0" Minimum="0" Maximum="100" Visibility="Collapsed" Foreground="#FFD700" Background="#333333"/>
+                            <ProgressBar x:Name="ProgressDism" Height="3" Width="75" Margin="0,4,0,0" Minimum="0" Maximum="100" Visibility="Collapsed" Foreground="{DynamicResource AccentColor}" Background="{DynamicResource BorderSubtle}"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>
@@ -1169,7 +1169,7 @@
 
             <!-- ====== SISTEMA E MEMÓRIA ====== -->
             <TextBlock Text="Sistema e Mem&#xF3;ria" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
                     <!-- Disable Prefetch/Superfetch -->
@@ -1184,7 +1184,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define EnablePrefetcher=0 e EnableSuperfetch=0. Desativa os servi&#xE7;os de pr&#xE9;-busca e superfetch, reduzindo opera&#xE7;&#xF5;es de I/O em segundo plano em SSDs."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1195,7 +1195,7 @@
                         <CheckBox x:Name="ChkDisablePrefetch" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisablePrefetch_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Large System Cache -->
                     <Grid Margin="20">
@@ -1209,7 +1209,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define LargeSystemCache=1. Faz o sistema usar mais mem&#xF3;ria RAM como cache de arquivos, melhorando desempenho em aplica&#xE7;&#xF5;es que acessam muitos arquivos."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1220,7 +1220,7 @@
                         <CheckBox x:Name="ChkLargeSystemCache" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkLargeSystemCache_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Disable Paging Executive -->
                     <Grid Margin="20">
@@ -1234,7 +1234,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define DisablePagingExecutive=1. Mant&#xE9;m os drivers e c&#xF3;digo do kernel na RAM f&#xED;sica, nunca paginados para o disco. Aumenta performance mas consome mais RAM."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1245,7 +1245,7 @@
                         <CheckBox x:Name="ChkDisablePagingExecutive" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisablePagingExecutive_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Disable Exception Chain Validation -->
                     <Grid Margin="20">
@@ -1259,7 +1259,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa a valida&#xE7;&#xE3;o de cadeia de exce&#xE7;&#xF5;es do kernel (DisableExceptionChainValidation=1). Pode causar ganho marginal de FPS, reduzindo a seguran&#xE7;a."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1270,7 +1270,7 @@
                         <CheckBox x:Name="ChkDisableExceptionChain" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableExceptionChain_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Disable CFG -->
                     <Grid Margin="20">
@@ -1284,7 +1284,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa Control Flow Guard (EnableCfg=0). Reduz a prote&#xE7;&#xE3;o contra exploits de mem&#xF3;ria para ganho de FPS em jogos. N&#xE3;o recomendado em m&#xE1;quinas de trabalho."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1295,7 +1295,7 @@
                         <CheckBox x:Name="ChkDisableCfg" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableCfg_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Distribute Timers -->
                     <Grid Margin="20">
@@ -1309,7 +1309,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define DistributeTimers=1. Permite que o sistema distribua timers entre n&#xFA;cleos de CPU, melhorando precis&#xE3;o de temporiza&#xE7;&#xE3;o e reduzindo lat&#xEA;ncia."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1324,7 +1324,7 @@
 
             <!-- ====== PRIVACIDADE E TELEMETRIA ====== -->
             <TextBlock Text="Privacidade e Telemetria" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
                     <!-- Block Cortana -->
@@ -1339,7 +1339,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Bloqueia Cortana completamente via pol&#xED;tica de grupo (AllowCortana=0, AllowCloudSearch=0, etc). Remove assistente e busca na web."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1350,7 +1350,7 @@
                         <CheckBox x:Name="ChkBlockCortana" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkBlockCortana_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Disable Activity Feed -->
                     <Grid Margin="20">
@@ -1364,7 +1364,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o Activity Feed do Windows (EnableActivityFeed=0). Impede que o sistema colete e compartilhe hist&#xF3;rico de atividades com a Microsoft."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1375,7 +1375,7 @@
                         <CheckBox x:Name="ChkDisableActivityFeed" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableActivityFeed_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Disable Windows Feeds -->
                     <Grid Margin="20">
@@ -1389,7 +1389,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa Windows Feeds (EnableFeeds=0), tamb&#xE9;m conhecido como 'News &amp; Interests'. Remove o feed de not&#xED;cias da barra de tarefas."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1400,7 +1400,7 @@
                         <CheckBox x:Name="ChkDisableWindowsFeeds" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableWindowsFeeds_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Block Advertising ID -->
                     <Grid Margin="20">
@@ -1414,7 +1414,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Bloqueia o Advertising ID do Windows (DisabledByGroupPolicy=1). Impede que apps usem seu ID para an&#xFA;ncios personalizados."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1425,7 +1425,7 @@
                         <CheckBox x:Name="ChkBlockAdvertisingId" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkBlockAdvertisingId_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Disable Consumer Features -->
                     <Grid Margin="20">
@@ -1439,7 +1439,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa Windows Consumer Features (DisableWindowsConsumerFeatures=1). Bloqueia sugest&#xF5;es de apps da Store, dicas e conte&#xFA;do promocional da Microsoft."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1450,7 +1450,7 @@
                         <CheckBox x:Name="ChkDisableConsumerFeatures" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableConsumerFeatures_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Disable Error Reporting -->
                     <Grid Margin="20">
@@ -1464,7 +1464,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o Windows Error Reporting (WER) via pol&#xED;tica: Disabled=1, DoReport=0, LoggingDisabled=1. Impede envio de relat&#xF3;rios de erro &#xE0; Microsoft."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1479,7 +1479,7 @@
 
             <!-- ====== REDE AVANÇADA ====== -->
             <TextBlock Text="Rede Avan&#xE7;ada" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
                     <!-- Network Throttling Index -->
@@ -1494,7 +1494,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define NetworkThrottlingIndex=0xFFFFFFFF. Remove a limita&#xE7;&#xE3;o de rede para multim&#xED;dia, permitindo que jogos e aplicativos de tempo real usem largura de banda m&#xE1;xima."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1509,7 +1509,7 @@
 
             <!-- ====== SERVIÇOS DO SISTEMA ====== -->
             <TextBlock Text="Servi&#xE7;os do Sistema (Adicionais)" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
                     <!-- Print Spooler -->
@@ -1524,7 +1524,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o servi&#xE7;o de impress&#xE3;o (Spooler). Economiza recursos significativos se voc&#xEA; n&#xE3;o usa impressora. Reative se precisar imprimir."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1535,7 +1535,7 @@
                         <CheckBox x:Name="ChkDisableSpooler" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableSpooler_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Bluetooth -->
                     <Grid Margin="20">
@@ -1549,7 +1549,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa todos os servi&#xE7;os Bluetooth (BTAGService, bthserv, BthAvctpSvc, BluetoothUserService). Economiza recursos em PCs sem Bluetooth."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1560,7 +1560,7 @@
                         <CheckBox x:Name="ChkDisableBluetooth" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableBluetooth_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- MapsBroker -->
                     <Grid Margin="20">
@@ -1574,7 +1574,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o servi&#xE7;o MapsBroker (Downloaded Maps Manager). Impede que o Windows baixe mapas offline em segundo plano."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1585,7 +1585,7 @@
                         <CheckBox x:Name="ChkDisableMapsBroker" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkDisableMapsBroker_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- SysMain -->
                     <Grid Margin="20">
@@ -1599,7 +1599,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Desativa o SysMain (Superfetch). Em SSDs, esse servi&#xE7;o &#xE9; desnecess&#xE1;rio e pode causar uso elevado de CPU/Disco. Recomendado para sistemas com SSD."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1614,7 +1614,7 @@
 
             <!-- ====== PERIFÉRICOS ====== -->
             <TextBlock Text="Perif&#xE9;ricos" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
 
                     <!-- Keyboard Data Queue -->
@@ -1629,7 +1629,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define o tamanho da fila de dados do teclado para 100 (KeyboardDataQueueSize=100). Reduz perda de inputs em jogos de alta velocidade."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -1640,7 +1640,7 @@
                         <CheckBox x:Name="ChkKeyboardDataQueue" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkKeyboardDataQueue_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Mouse Data Queue -->
                     <Grid Margin="20">
@@ -1654,7 +1654,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Define o tamanho da fila de dados do mouse para 100 (MouseDataQueueSize=100). Melhora a precis&#xE3;o e resposta do mouse em jogos."/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">

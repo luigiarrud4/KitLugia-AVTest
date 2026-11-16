@@ -82,4 +82,61 @@
         <Setter Property="Padding" Value="16"/>
     </Style>
 
+    <!-- Card de etapa "passo a passo" (WinPE Tools / Fresh Install + Preservacao):
+         superficie escura com borda sutil, raio 10 e padding generoso. Era copiado
+         identico nas Pages WinpeToolsPage e ReinstallPreservePage. -->
+    <Style x:Key="StepCardStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="#1A1A1A"/>
+        <Setter Property="BorderBrush" Value="#333"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="15"/>
+    </Style>
+
+    <!-- Card de metrica: superficie compacta para valor + rotulo. -->
+    <Style x:Key="StatCard" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{DynamicResource Surface1}"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="16,12"/>
+        <Setter Property="Margin" Value="0,0,8,0"/>
+        <Setter Property="MinWidth" Value="140"/>
+    </Style>
+
+    <!-- Cartao de secao de configuracoes: sombra sutil que reforca no hover. -->
+    <Style x:Key="SettingsCard" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{DynamicResource Surface1}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtle}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="20"/>
+        <Setter Property="Margin" Value="0,0,0,15"/>
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect Color="#000000" BlurRadius="5" ShadowDepth="2" Opacity="0.3"/>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                <Setter Property="Effect" Value="{DynamicResource DropShadowEffect}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Card de resultado clicavel: hover so' por cor (sem escala/sombra por item). -->
+    <Style x:Key="SearchResultCardStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="#10FFFFFF"/>
+        <Setter Property="BorderBrush" Value="#2E2E2E"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                <Setter Property="Background" Value="#1AFFFFFF"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
 </ResourceDictionary>

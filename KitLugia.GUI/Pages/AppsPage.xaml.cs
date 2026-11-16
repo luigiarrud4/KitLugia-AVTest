@@ -240,7 +240,7 @@ namespace KitLugia.GUI.Pages
             if (BloatwareList != null) BloatwareList.ItemsSource = null;
 
             // Spinner só gira enquanto o painel está visível (Loaded-trigger girava para sempre)
-            SetSpinnerRunning(BloatwareSpinner, BloatwareLoadingPanel?.Visibility == Visibility.Visible);
+            SetSpinnerRunning(BloatwareLoadingPanel?.Spinner, BloatwareLoadingPanel?.Visibility == Visibility.Visible);
 
             if (BloatwareIconProgressText != null) BloatwareIconProgressText.Text = "Ícones carregados: 0/0";
 
@@ -296,7 +296,7 @@ namespace KitLugia.GUI.Pages
             finally
             {
                 if (BloatwareLoadingPanel != null) BloatwareLoadingPanel.Visibility = Visibility.Collapsed;
-                SetSpinnerRunning(BloatwareSpinner, false); // para a rotação do spinner
+                SetSpinnerRunning(BloatwareLoadingPanel?.Spinner, false); // para a rotação do spinner
                 Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, success, message);
             }
         }
@@ -433,8 +433,8 @@ namespace KitLugia.GUI.Pages
                     BloatwareLoadingPanel.Visibility = Visibility.Visible;
                     IProgress<string> bloatProgress = new Progress<string>(msg =>
                     {
-                        if (TxtBloatwareProgress != null)
-                            TxtBloatwareProgress.Text = msg;
+                        if (BloatwareLoadingPanel != null)
+                            BloatwareLoadingPanel.Progress = msg;
                     });
 
                     bloatProgress.Report($"Removendo {app.DisplayName}...");
@@ -796,8 +796,8 @@ namespace KitLugia.GUI.Pages
                     // Pós-scan LEVE e focado por pacote (localizações determinísticas)
                     IProgress<string> batchProgress = new Progress<string>(msg =>
                     {
-                        if (TxtBloatwareProgress != null)
-                            TxtBloatwareProgress.Text = msg;
+                        if (BloatwareLoadingPanel != null)
+                            BloatwareLoadingPanel.Progress = msg;
                     });
 
                     batchProgress.Report($"Removendo 0/{total}...");
@@ -857,7 +857,7 @@ namespace KitLugia.GUI.Pages
                         }
                     }
 
-                    if (TxtBloatwareProgress != null) TxtBloatwareProgress.Text = "";
+                    if (BloatwareLoadingPanel != null) BloatwareLoadingPanel.Progress = "";
                     BloatwareLoadingPanel.Visibility = Visibility.Collapsed;
                     string message = $"Remoção concluída:\n\n✅ {successCount} app(s) removidos";
                     if (failCount > 0) message += $"\n⚠️ {failCount} falharam";
@@ -1235,7 +1235,7 @@ namespace KitLugia.GUI.Pages
             {
                 // Pode ser chamada de qualquer thread (a fase de enriquecimento e
                 // fire-and-forget e sua continuacao pode nao ter SynchronizationContext).
-                // TODO acesso a UI (TxtProgramsProgress, VMs com INotifyPropertyChanged)
+                // TODO acesso a UI (ProgramsLoadingPanel.Progress, VMs com INotifyPropertyChanged)
                 // acontece DENTRO do Dispatcher — fora dele o WPF lanca
                 // "O thread de chamada nao pode acessar este objeto" e a fase morre
                 // silenciosamente (apps ficavam sem tamanho).
@@ -1253,8 +1253,8 @@ namespace KitLugia.GUI.Pages
                         .ToList();
                     if (list.Count == 0) return (string[]?)null;
 
-                    if (TxtProgramsProgress != null)
-                        TxtProgramsProgress.Text = $"Medindo tamanhos via MFT ({list.Count} pastas)...";
+                    if (ProgramsLoadingPanel != null)
+                        ProgramsLoadingPanel.Progress = $"Medindo tamanhos via MFT ({list.Count} pastas)...";
 
                     return (string[]?)list.ToArray();
                 });
@@ -1276,8 +1276,8 @@ namespace KitLugia.GUI.Pages
                         }
                     }
                     UpdateProgramMetaOnly();
-                    if (TxtProgramsProgress != null)
-                        TxtProgramsProgress.Text = $"Tamanhos medidos via MFT ({sizes.Count} apps).";
+                    if (ProgramsLoadingPanel != null)
+                        ProgramsLoadingPanel.Progress = $"Tamanhos medidos via MFT ({sizes.Count} apps).";
                 });
             }
             catch (Exception ex)
@@ -1299,8 +1299,8 @@ namespace KitLugia.GUI.Pages
             {
                 if (programs.Count == 0) return;
 
-                if (TxtProgramsProgress != null)
-                    await Dispatcher.InvokeAsync(() => TxtProgramsProgress.Text = "Completando informações dos apps...");
+                if (ProgramsLoadingPanel != null)
+                    await Dispatcher.InvokeAsync(() => ProgramsLoadingPanel.Progress = "Completando informações dos apps...");
 
                 await Task.Run(() =>
                 {
@@ -1355,8 +1355,8 @@ namespace KitLugia.GUI.Pages
                     // Meta in-place (INotifyPropertyChanged): nada de recriar a coleção.
                     UpdateProgramMetaOnly();
 
-                    if (TxtProgramsProgress != null)
-                        TxtProgramsProgress.Text = "";
+                    if (ProgramsLoadingPanel != null)
+                        ProgramsLoadingPanel.Progress = "";
                 });
 
                 await ComputeMissingFolderSizesAsync();
@@ -1712,8 +1712,8 @@ namespace KitLugia.GUI.Pages
 
                     IProgress<string> batchProgress = new Progress<string>(msg =>
                     {
-                        if (TxtProgramsProgress != null)
-                            TxtProgramsProgress.Text = msg;
+                        if (ProgramsLoadingPanel != null)
+                            ProgramsLoadingPanel.Progress = msg;
                     });
 
                     // SEQUENCIAL: desinstaladores GUI/UAC nunca devem rodar em paralelo
@@ -1910,7 +1910,7 @@ namespace KitLugia.GUI.Pages
 
             if (PortableLoadingPanel != null) PortableLoadingPanel.Visibility = Visibility.Visible;
             if (PortableList != null) PortableList.ItemsSource = null;
-            if (TxtPortableProgress != null) TxtPortableProgress.Text = "Lendo índice MFT dos volumes (1ª vez ~15s)...";
+            if (PortableLoadingPanel != null) PortableLoadingPanel.Progress = "Lendo índice MFT dos volumes (1ª vez ~15s)...";
 
             try
             {
@@ -1925,8 +1925,8 @@ namespace KitLugia.GUI.Pages
             // presa esperando a fila do Dispatcher. InvokeAsync so enfileira.
             Dispatcher.InvokeAsync(() =>
             {
-                if (TxtPortableProgress != null)
-                    TxtPortableProgress.Text = $"Varrendo pastas... {done}/{total}";
+                if (PortableLoadingPanel != null)
+                    PortableLoadingPanel.Progress = $"Varrendo pastas... {done}/{total}";
             });
         }, token, status: msg =>
         {
@@ -1934,8 +1934,8 @@ namespace KitLugia.GUI.Pages
             // Vem do Core já com throttle; InvokeAsync so enfileira.
             Dispatcher.InvokeAsync(() =>
             {
-                if (TxtPortableProgress != null)
-                    TxtPortableProgress.Text = msg;
+                if (PortableLoadingPanel != null)
+                    PortableLoadingPanel.Progress = msg;
             });
         }, scope.Value.IncludeProfile, scope.Value.Roots), token);
 
@@ -2438,8 +2438,8 @@ namespace KitLugia.GUI.Pages
                     using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
                     IProgress<string> junkProgress = new Progress<string>(msg =>
                     {
-                        if (TxtBloatwareProgress != null)
-                            TxtBloatwareProgress.Text = msg;
+                        if (BloatwareLoadingPanel != null)
+                            BloatwareLoadingPanel.Progress = msg;
                     });
                     await Task.Run(() => DeepUninstaller.PerformCleanup(selectedFiles, selectedReg, result, displayName: item.AppName, ct: cleanupCts.Token, progress: junkProgress, forceToRecycleBin: true));
 
@@ -3415,8 +3415,8 @@ private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult sca
 
                 IProgress<string> progress = new Progress<string>(msg =>
                 {
-                    if (TxtProgramsProgress != null)
-                        TxtProgramsProgress.Text = msg;
+                    if (ProgramsLoadingPanel != null)
+                        ProgramsLoadingPanel.Progress = msg;
                 });
 
                 progress.Report($"Desinstalando {program.DisplayName}...");
@@ -3434,7 +3434,7 @@ private void ShowReviewPanel(string appName, DeepUninstaller.UninstallResult sca
                         quietUninstallString: program.QuietUninstallString);
                 });
 
-                if (TxtProgramsProgress != null) TxtProgramsProgress.Text = "";
+                if (ProgramsLoadingPanel != null) ProgramsLoadingPanel.Progress = "";
                 HideProgramsLoading();
 
                 StartBackgroundScan(program, result);

@@ -158,6 +158,7 @@ namespace KitLugia.GUI
         ContextMenuManagerPage,
         ContextMenuAddPage,
         WinpeTools,
+        HopsShrink,
         ReinstallPreserve,
         BcdRepair,
         DiskConverter,
@@ -1231,6 +1232,7 @@ namespace KitLugia.GUI
                 ContextMenuAddPage => PageType.ContextMenuAddPage,
                 ForceStopUnlockPage => PageType.ForceStopUnlock,
                 WinpeToolsPage => PageType.WinpeTools,
+                HopsShrinkPage => PageType.HopsShrink,
                 ReinstallPreservePage => PageType.ReinstallPreserve,
                 _ => null
             };
@@ -1262,6 +1264,7 @@ namespace KitLugia.GUI
                 PageType.ContextMenuAddPage => new ContextMenuAddPage(),
                 PageType.ForceStopUnlock => new ForceStopUnlockPage(),
                 PageType.WinpeTools => new WinpeToolsPage(),
+                PageType.HopsShrink => new HopsShrinkPage(),
                 PageType.ReinstallPreserve => new ReinstallPreservePage(),
                 PageType.StoreRemake => new Pages.WindowsSettings.StoreRemakePage(),
                 _ => new DashboardPage()
@@ -1366,6 +1369,7 @@ namespace KitLugia.GUI
             ["💽"] = PageType.Partitions,
             ["🧰"] = PageType.Integrity,
             ["🛠️"] = PageType.WinpeTools,
+            ["🧪"] = PageType.HopsShrink,
             ["🔔"] = PageType.TraySettings,
             ["🚀"] = PageType.GameBoost,
             ["🔬"] = PageType.Diagnostic,
@@ -1464,6 +1468,7 @@ namespace KitLugia.GUI
             else if (MainFrame.Content is BcdRepairPage) BtnBcdRepair.IsChecked = true;
             else if (MainFrame.Content is DiskConverterPage) BtnDiskConverter.IsChecked = true;
             else if (MainFrame.Content is WinpeToolsPage) { SetDiscosExtrasExpanded(true); BtnWinpeTools.IsChecked = true; }
+            else if (MainFrame.Content is HopsShrinkPage) { SetDiscosExtrasExpanded(true); BtnHopsShrink.IsChecked = true; }
             // Fresh Install: sem atalho na sidebar (nao testado), mas se o usuario chegar pelo
             // Dashboard a categoria "Gerenciar Discos" ainda abre, para nao esconder onde ele esta.
             else if (MainFrame.Content is ReinstallPreservePage) { SetDiscosExtrasExpanded(true); }
@@ -1496,6 +1501,7 @@ namespace KitLugia.GUI
             if (BtnDrivers != null) BtnDrivers.IsChecked = false;
             if (BtnPartitions != null) BtnPartitions.IsChecked = false;
             if (BtnWinpeTools != null) BtnWinpeTools.IsChecked = false;
+            if (BtnHopsShrink != null) BtnHopsShrink.IsChecked = false;
             if (BtnBcdRepair != null) BtnBcdRepair.IsChecked = false;
             if (BtnDiskConverter != null) BtnDiskConverter.IsChecked = false;
 
@@ -1597,6 +1603,7 @@ namespace KitLugia.GUI
                 PageType.ContextMenuAddPage => new ContextMenuAddPage(),
                 PageType.ForceStopUnlock => new ForceStopUnlockPage(),
                 PageType.WinpeTools => new WinpeToolsPage(),
+                PageType.HopsShrink => new HopsShrinkPage(),
                 PageType.ReinstallPreserve => new ReinstallPreservePage(),
                 PageType.WindowsUpdate => new WindowsUpdatePage(),
                 PageType.StoreRemake => new Pages.WindowsSettings.StoreRemakePage(),

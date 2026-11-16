@@ -711,8 +711,8 @@ namespace KitLugia.GUI.Pages
                 TxtInjectedPath.Foreground = System.Windows.Media.Brushes.White;
                 
                 // Recalcular Tamanho Preview
-                int sizeGb = WinbootManager.CalculateRequiredSizeGB(_injectedPath);
-                UpdateStatus($"Tamanho estimado da partição: {sizeGb} GB (Base + Injeção)");
+                int sizeGb = WinbootManager.CalculateRequiredSizeGB(_injectedPath, TxtIsoPath.Text);
+                UpdateStatus($"Tamanho estimado da partição: {sizeGb} GB (ISO + kit + injeção + margem)");
             }
         }
 
@@ -742,7 +742,7 @@ namespace KitLugia.GUI.Pages
             var selPart = ComboPartitions.SelectedItem as PartitionInfo;
             if (selPart != null)
             {
-                int requiredGb = WinbootManager.CalculateRequiredSizeGB(_injectedPath);
+                int requiredGb = WinbootManager.CalculateRequiredSizeGB(_injectedPath, TxtIsoPath.Text);
                 int requiredMb = requiredGb * 1024;
                 long freeMb = (long)(selPart.FreeSpace / (1024L * 1024));
                 string selDrive = selPart.DriveLetter.Replace(":", "");
@@ -989,7 +989,7 @@ namespace KitLugia.GUI.Pages
             // Emergency Pre-Boot: deploy Alpine kernel + initramfs, reboot
             if (ChkEmergencyPreBoot.IsChecked == true)
             {
-                int requiredGb = WinbootManager.CalculateRequiredSizeGB(_injectedPath);
+                int requiredGb = WinbootManager.CalculateRequiredSizeGB(_injectedPath, TxtIsoPath.Text);
                 int sizeMb = requiredGb * 1024;
 
                 var result = System.Windows.MessageBox.Show(
@@ -1121,10 +1121,11 @@ namespace KitLugia.GUI.Pages
             try
             {
                 // 1. Criar Partição (Tamanho Adaptativo)
-                int requiredGb = WinbootManager.CalculateRequiredSizeGB(_injectedPath);
+                int requiredGb = WinbootManager.CalculateRequiredSizeGB(_injectedPath, selectedIsoPath);
                 int sizeMb = requiredGb * 1024;
 
                 UpdateStatus($"Criando partição de {requiredGb}GB (Smart Size)...");
+                bool shrinkFallbackScheduled = false;
                 bool partOk = await WinbootManager.CreateBootPartition(selectedPart.DriveLetter, sizeMb, WinbootManager.WINBOOT_LABEL, isMultiIso, false, selectedIsoPath, UpdateProgress,
                     async (msg) => await Dispatcher.InvokeAsync(() =>
                     {
@@ -1134,7 +1135,39 @@ namespace KitLugia.GUI.Pages
                             MessageBoxButton.YesNo,
                             MessageBoxImage.Warning);
                         return result == MessageBoxResult.Yes;
-                    }));
+                    }),
+                    async (msg) =>
+                    {
+                        ulong shrinkBytes = checked((ulong)sizeMb * 1024UL * 1024UL);
+                        if (selectedPart.FreeSpace < shrinkBytes)
+                        {
+                            await Dispatcher.InvokeAsync(() => ShowError(
+                                $"A partição tem apenas {selectedPart.FreeSpace / (1024.0 * 1024 * 1024):F1} GB livres, mas o WinBoot precisa liberar {sizeMb / 1024.0:F1} GB. Libere espaço no volume e tente novamente."));
+                            return false;
+                        }
+
+                        var choice = await Dispatcher.InvokeAsync(() => MessageBox.Show(
+                            msg + "\n\nA preparação desativa temporariamente hibernação/pagefile e apaga os pontos de restauração do volume (irreversível). As configurações compatíveis serão restauradas após a tentativa.\n\nDeseja continuar?",
+                            "Shrink sem WinPE — WinBoot", MessageBoxButton.YesNo, MessageBoxImage.Warning));
+                        if (choice != MessageBoxResult.Yes) return false;
+
+                        var (ok, message) = await OnlineShrinkManager.PrepareDeepShrinkAsync(
+                            char.ToUpperInvariant(selectedPart.DriveLetter.TrimEnd(':')[0]), sizeMb);
+                        shrinkFallbackScheduled = ok;
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            if (ok)
+                                UpdateStatus("Shrink sem WinPE preparado. Após o reboot, abra o WinBoot e inicie a criação novamente.");
+                            else
+                                ShowError($"Não foi possível preparar o shrink sem WinPE: {message}");
+                        });
+                        return ok;
+                    });
+                if (!partOk && shrinkFallbackScheduled)
+                {
+                    Services.BackgroundTaskTracker.Instance.CompleteTask(taskId, true, "Shrink sem WinPE agendado; retomar WinBoot após reiniciar");
+                    return;
+                }
                 if (!partOk) throw new Exception("Falha ao criar partição. O disco pode não ter espaço não alocado suficiente.");
 
                 // 2. Aguardar estabilizar (polling rápido, cache IOCTL evita WMI lento)
@@ -1589,7 +1622,7 @@ namespace KitLugia.GUI.Pages
 
             try
             {
-                int requiredGB = WinbootManager.CalculateRequiredSizeGB(_injectedPath);
+                int requiredGB = WinbootManager.CalculateRequiredSizeGB(_injectedPath, TxtIsoPath.Text);
 
                 var (hasEnough, freeGB, reqGB, message) = await Task.Run(() =>
                     WinbootManager.CheckSpaceForInstallation(part.DriveLetter, requiredGB));

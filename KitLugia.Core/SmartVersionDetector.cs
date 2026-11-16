@@ -116,49 +116,10 @@ namespace KitLugia.Core
         {
             try
             {
-                // ?? Verificar conectividade primeiro
-                Logger.Log("Verificando conectividade com GitHub...");
-                using var testClient = KitHttp.CreateClient(TimeSpan.FromSeconds(10));
-                testClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-
-                try
-                {
-                    var testResponse = await testClient.GetAsync("https://api.github.com/rate_limit");
-
-                    if (!testResponse.IsSuccessStatusCode)
-                    {
-                        var statusCode = (int)testResponse.StatusCode;
-                        Logger.Log($"? GitHub API inacessível: {testResponse.StatusCode} ({statusCode})");
-
-                        // ?? Tratamento espec - fico para diferentes status codes
-                        switch (statusCode)
-                        {
-                            case 403:
-                                Logger.Log("GitHub API: 403 Forbidden - Possível Rate Limit ou IP bloqueado");
-                                break;
-                            case 429:
-                                Logger.Log("GitHub API: 429 Too Many Requests - Rate Limit excedido");
-                                break;
-                            case 401:
-                                Logger.Log("GitHub API: 401 Unauthorized - Token inválido ou expirado");
-                                break;
-                            default:
-                                Logger.Log($"? GitHub API: {statusCode} - Erro desconhecido");
-                                break;
-                        }
-
-                        return GetFallbackReleases();
-                    }
-
-                    Logger.Log("⚠️ GitHub API acessível - buscando releases...");
-                    await Task.Delay(1000); // Delay de 1 segundo para evitar rate limit
-                }
-                catch (HttpRequestException ex)
-                {
-                    Logger.Log($"? Erro de conexão com GitHub: {ex.Message}");
-                    return GetFallbackReleases();
-                }
-
+                // Antes: uma requisição extra a /rate_limit + Task.Delay(1000) só para "testar
+                // conectividade" antes da requisição real. Isso dobrava as chamadas à API
+                // anônima (limite de 60/h por IP) e atrasava a tela em 1 s+. A própria
+                // requisição abaixo já trata 403/429/offline via os catch (fallback p/ cache).
                 Logger.Log("Buscando releases do GitHub...");
 
                 var response = await _httpClient.GetAsync(ReleasesApiUrl);
@@ -238,40 +199,14 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Retorna releases placeholder quando GitHub est - inacessível
+        /// Retorna lista vazia (sem dados inventados) quando GitHub está inacessível e não há cache
         /// </summary>
         private static List<GitHubRelease> GetPlaceholderReleases()
         {
-            Logger.Log("Usando releases placeholder (GitHub inacessível)");
-            
-            var now = DateTime.Now;
-            return new List<GitHubRelease>
-            {
-                new GitHubRelease 
-                { 
-                    TagName = "2.0.5", 
-                    Name = "KitLugia v2.0.5 - Update Manual + Timezone",
-                    PublishedAt = now.AddDays(-7), // 7 dias atr - s
-                    Prerelease = false,
-                    Draft = false
-                },
-                new GitHubRelease 
-                { 
-                    TagName = "2.0.4", 
-                    Name = "KitLugia v2.0.4 - GameBoost Fix",
-                    PublishedAt = now.AddDays(-14), // 14 dias atr - s
-                    Prerelease = false,
-                    Draft = false
-                },
-                new GitHubRelease 
-                { 
-                    TagName = "2.0.3", 
-                    Name = "KitLugia v2.0.3 - Network Diagnostics",
-                    PublishedAt = now.AddDays(-21), // 21 dias atr - s
-                    Prerelease = false,
-                    Draft = false
-                }
-            };
+            // Antes devolvia 3 releases FALSAS (2.0.5/2.0.4/2.0.3) quando o GitHub estava
+            // inacessível, e a UI mostrava "Releases Online: 3" como se fosse real.
+            Logger.Log("GitHub inacessível e sem cache - nenhuma release disponível");
+            return new List<GitHubRelease>();
         }
         
         /// <summary>

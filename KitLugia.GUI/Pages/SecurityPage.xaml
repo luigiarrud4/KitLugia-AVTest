@@ -12,11 +12,11 @@
             <StackPanel Margin="0,0,0,25">
                 <TextBlock Style="{StaticResource PageTitleStyle}" Text="Seguran&#xE7;a do Sistema"/>
                 <TextBlock Text="Gerencie prote&#xE7;&#xF5;es do Windows. Altera&#xE7;&#xF5;es cr&#xED;ticas exigem reinicializa&#xE7;&#xE3;o." 
-                           Foreground="{StaticResource TextSecondary}" Margin="0,6,0,0"/>
+                           Foreground="{DynamicResource TextSecondary}" Margin="0,6,0,0"/>
             </StackPanel>
 
             <!-- Score de Seguran&#xE7;a -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" 
                     BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -25,9 +25,9 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock Text="&#x1F6E1;&#xFE0F; Score de Seguran&#xE7;a" FontSize="16" FontWeight="Bold" 
-                                   Foreground="{StaticResource AccentColor}" Margin="0,0,0,6"/>
+                                   Foreground="{DynamicResource AccentColor}" Margin="0,0,0,6"/>
                         <TextBlock x:Name="TxtSecurityScore" Text="Calculando..." FontSize="13" 
-                                   Foreground="{StaticResource TextSecondary}"/>
+                                   Foreground="{DynamicResource TextSecondary}"/>
                     </StackPanel>
                     <Button Grid.Column="1" Content="&#x1F504; Atualizar" Style="{StaticResource SecondaryButtonStyle}" 
                             Width="110" Height="36" Click="BtnRefresh_Click"/>
@@ -35,21 +35,21 @@
             </Border>
 
             <!-- Card: Prote&#xE7;&#xE3;o em Tempo Real -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" 
                     BorderThickness="1" CornerRadius="8" Padding="22" Margin="0,0,0,16" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                         <TextBlock Text="&#x1F510;" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <StackPanel>
                             <TextBlock Text="Prote&#xE7;&#xE3;o em Tempo Real" FontSize="16" FontWeight="Bold" 
-                                       Foreground="{StaticResource AccentColor}"/>
+                                       Foreground="{DynamicResource AccentColor}"/>
                             <TextBlock Text="Controle o Windows Defender e prote&#xE7;&#xF5;es ativas." 
-                                       FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                       FontSize="12" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                     </StackPanel>
 
                     <!-- Windows Defender -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -57,9 +57,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="Windows Defender (Antiv&#xED;rus)" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock x:Name="TxtDefenderStatus" Text="Verificando..." FontSize="11" 
-                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="ChkDefender" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
                                       Click="ChkDefender_Click" VerticalAlignment="Center"/>
@@ -67,7 +67,7 @@
                     </Border>
 
                     <!-- Prote&#xE7;&#xE3;o em Tempo Real -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -75,9 +75,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="Prote&#xE7;&#xE3;o em Tempo Real" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="Monitora arquivos e processos continuamente." FontSize="11" 
-                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="ChkRealtimeProtection" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
                                       Click="ChkRealtimeProtection_Click" VerticalAlignment="Center"/>
@@ -85,7 +85,7 @@
                     </Border>
 
                     <!-- VBS / Virtualiza&#xE7;&#xE3;o -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -93,7 +93,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="VBS &#x2014; Seguran&#xE7;a Baseada em Virtualiza&#xE7;&#xE3;o" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="&#x26A0;&#xFE0F; Desativar aumenta FPS em jogos mas reduz seguran&#xE7;a. Requer reinicializa&#xE7;&#xE3;o." 
                                            FontSize="11" Foreground="#FFA500" Margin="0,2,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
@@ -103,7 +103,7 @@
                     </Border>
 
                     <!-- SmartScreen -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -111,9 +111,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="SmartScreen (Filtro de Sites/Apps)" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="Bloqueia downloads e sites maliciosos conhecidos." FontSize="11" 
-                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="ChkSmartScreen" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
                                       Click="ChkSmartScreen_Click" VerticalAlignment="Center"/>
@@ -123,21 +123,21 @@
             </Border>
 
             <!-- Card: Firewall e Rede -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" 
                     BorderThickness="1" CornerRadius="8" Padding="22" Margin="0,0,0,16" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                         <TextBlock Text="&#x1F9F1;" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <StackPanel>
                             <TextBlock Text="Firewall e Rede" FontSize="16" FontWeight="Bold" 
-                                       Foreground="{StaticResource AccentColor}"/>
+                                       Foreground="{DynamicResource AccentColor}"/>
                             <TextBlock Text="Controle o firewall e prote&#xE7;&#xF5;es de rede." 
-                                       FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                       FontSize="12" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                     </StackPanel>
 
                     <!-- Firewall -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -145,9 +145,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="Firewall do Windows" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock x:Name="TxtFirewallStatus" Text="Verificando..." FontSize="11" 
-                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="ChkFirewall" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
                                       Click="ChkFirewall_Click" VerticalAlignment="Center"/>
@@ -155,7 +155,7 @@
                     </Border>
 
                     <!-- Registro Remoto -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -163,9 +163,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="Registro Remoto (Remote Registry)" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="Permite acesso remoto ao registro. Recomendado: Desativado." FontSize="11" 
-                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="ChkRemoteRegistry" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
                                       Click="ChkRemoteRegistry_Click" VerticalAlignment="Center"/>
@@ -173,7 +173,7 @@
                     </Border>
 
                     <!-- &#xC1;rea de Trabalho Remota -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -181,9 +181,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="&#xC1;rea de Trabalho Remota (RDP)" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="Permite controle remoto do PC. Desative se n&#xE3;o usar." FontSize="11" 
-                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="ChkRDP" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
                                       Click="ChkRDP_Click" VerticalAlignment="Center"/>
@@ -193,21 +193,21 @@
             </Border>
 
             <!-- Card: Privacidade e Telemetria -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" 
                     BorderThickness="1" CornerRadius="8" Padding="22" Margin="0,0,0,16" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                         <TextBlock Text="&#x1F441;&#xFE0F;" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <StackPanel>
                             <TextBlock Text="Privacidade e Telemetria" FontSize="16" FontWeight="Bold" 
-                                       Foreground="{StaticResource AccentColor}"/>
+                                       Foreground="{DynamicResource AccentColor}"/>
                             <TextBlock Text="Controle quais dados o Windows envia para a Microsoft." 
-                                       FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                       FontSize="12" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                     </StackPanel>
 
                     <!-- Telemetria -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -215,9 +215,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="Telemetria (Dados de Diagn&#xF3;stico)" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="Envia dados de uso para a Microsoft. Recomendado: Desativado." FontSize="11" 
-                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="ChkTelemetry" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
                                       Click="ChkTelemetry_Click" VerticalAlignment="Center"/>
@@ -225,7 +225,7 @@
                     </Border>
 
                     <!-- Hist&#xF3;rico de Atividades -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -233,9 +233,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="Hist&#xF3;rico de Atividades (Timeline)" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="Registra apps e arquivos abertos. Recomendado: Desativado." FontSize="11" 
-                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="ChkActivityHistory" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
                                       Click="ChkActivityHistory_Click" VerticalAlignment="Center"/>
@@ -243,7 +243,7 @@
                     </Border>
 
                     <!-- ID de Publicidade -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -251,9 +251,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="ID de Publicidade (Rastreamento de An&#xFA;ncios)" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="Permite que apps rastreiem seu comportamento para an&#xFA;ncios." FontSize="11" 
-                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="ChkAdID" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
                                       Click="ChkAdID_Click" VerticalAlignment="Center"/>
@@ -261,7 +261,7 @@
                     </Border>
 
                     <!-- Localiza&#xE7;&#xE3;o -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -269,9 +269,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="Servi&#xE7;os de Localiza&#xE7;&#xE3;o" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="Permite que apps acessem sua localiza&#xE7;&#xE3;o geogr&#xE1;fica." FontSize="11" 
-                                           Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="ChkLocation" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" 
                                       Click="ChkLocation_Click" VerticalAlignment="Center"/>
@@ -281,16 +281,16 @@
             </Border>
 
             <!-- Card: UAC -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" 
                     BorderThickness="1" CornerRadius="8" Padding="22" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                         <TextBlock Text="&#x1F511;" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <StackPanel>
                             <TextBlock Text="Controle de Conta de Usu&#xE1;rio (UAC)" FontSize="16" FontWeight="Bold" 
-                                       Foreground="{StaticResource AccentColor}"/>
+                                       Foreground="{DynamicResource AccentColor}"/>
                             <TextBlock Text="N&#xED;vel de prote&#xE7;&#xE3;o contra altera&#xE7;&#xF5;es n&#xE3;o autorizadas." 
-                                       FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                       FontSize="12" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -301,48 +301,48 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock x:Name="TxtUACLevel" Text="N&#xED;vel atual: Verificando..." FontSize="13" 
-                                       Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                                       Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,4"/>
                             <TextBlock Text="Recomendado: Notificar sempre (n&#xED;vel m&#xE1;ximo)." FontSize="11" 
-                                       Foreground="{StaticResource TextMuted}"/>
+                                       Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <ComboBox x:Name="CmbUACLevel" Grid.Column="1" Height="36" VerticalAlignment="Center"
-                                  Background="{StaticResource CardBackground}"
-                                  Foreground="{StaticResource TextPrimary}"
-                                  BorderBrush="{StaticResource CardBorder}"
+                                  Background="{DynamicResource CardBackground}"
+                                  Foreground="{DynamicResource TextPrimary}"
+                                  BorderBrush="{DynamicResource CardBorder}"
                                   SelectionChanged="CmbUACLevel_SelectionChanged">
                             <ComboBoxItem Content="Sempre Notificar (M&#xE1;ximo)" Tag="2"
-                                          Foreground="{StaticResource TextPrimary}"
-                                          Background="{StaticResource CardBackground}"/>
+                                          Foreground="{DynamicResource TextPrimary}"
+                                          Background="{DynamicResource CardBackground}"/>
                             <ComboBoxItem Content="Notificar Mudan&#xE7;as de Apps" Tag="1"
-                                          Foreground="{StaticResource TextPrimary}"
-                                          Background="{StaticResource CardBackground}"/>
+                                          Foreground="{DynamicResource TextPrimary}"
+                                          Background="{DynamicResource CardBackground}"/>
                             <ComboBoxItem Content="Notificar Sem Escurecer" Tag="0"
-                                          Foreground="{StaticResource TextPrimary}"
-                                          Background="{StaticResource CardBackground}"/>
+                                          Foreground="{DynamicResource TextPrimary}"
+                                          Background="{DynamicResource CardBackground}"/>
                             <ComboBoxItem Content="Nunca Notificar (Desativado)" Tag="-1"
-                                          Foreground="{StaticResource TextPrimary}"
-                                          Background="{StaticResource CardBackground}"/>
+                                          Foreground="{DynamicResource TextPrimary}"
+                                          Background="{DynamicResource CardBackground}"/>
                         </ComboBox>
                     </Grid>
                 </StackPanel>
             </Border>
 
             <!-- Card: A&#xE7;&#xF5;es R&#xE1;pidas -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" 
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" 
                     BorderThickness="1" CornerRadius="8" Padding="22" Margin="0,16,0,0" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                         <TextBlock Text="&#x26A1;" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <StackPanel>
                             <TextBlock Text="A&#xE7;&#xF5;es R&#xE1;pidas" FontSize="16" FontWeight="Bold" 
-                                       Foreground="{StaticResource AccentColor}"/>
+                                       Foreground="{DynamicResource AccentColor}"/>
                             <TextBlock Text="Perfis prontos que aplicam v&#xE1;rias prote&#xE7;&#xF5;es de uma vez." 
-                                       FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                       FontSize="12" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                     </StackPanel>
 
                     <!-- M&#xE1;xima Seguran&#xE7;a -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -350,9 +350,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Margin="0,0,12,0">
                                 <TextBlock Text="M&#xE1;xima Seguran&#xE7;a" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="Liga Defender, Firewall, SmartScreen, VBS e UAC m&#xE1;ximo; desliga telemetria, RDP e Registro Remoto." 
-                                           FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                           FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                             <Button Grid.Column="1" Content="&#x1F6E1;&#xFE0F; ATIVAR" Click="BtnMaxSecurity_Click" 
                                     Style="{StaticResource GoldButtonStyle}" Width="120" Height="32" VerticalAlignment="Center"/>
@@ -360,7 +360,7 @@
                     </Border>
 
                     <!-- Modo Gaming -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -368,9 +368,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Margin="0,0,12,0">
                                 <TextBlock Text="Modo Gaming" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="Desliga VBS e telemetria e o ID de publicidade para ganho de desempenho." 
-                                           FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                           FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                             <Button Grid.Column="1" Content="&#x1F3AE; ATIVAR" Click="BtnGamingMode_Click" 
                                     Style="{StaticResource SecondaryButtonStyle}" Width="120" Height="32" VerticalAlignment="Center"/>
@@ -378,7 +378,7 @@
                     </Border>
 
                     <!-- Restaurar Padr&#xF5;es -->
-                    <Border Background="#1A1A1A" CornerRadius="6" Padding="14,10">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="14,10">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -386,9 +386,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Margin="0,0,12,0">
                                 <TextBlock Text="Restaurar Padr&#xF5;es do Windows" FontSize="13" FontWeight="SemiBold" 
-                                           Foreground="{StaticResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
                                 <TextBlock Text="Reverte todas as configura&#xE7;&#xF5;es desta p&#xE1;gina para o padr&#xE3;o do Windows." 
-                                           FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                           FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                             <Button Grid.Column="1" Content="&#x21A9;&#xFE0F; RESTAURAR" Click="BtnRestoreDefaults_Click" 
                                     Style="{StaticResource DeleteButtonStyle}" Width="120" Height="32" VerticalAlignment="Center"/>

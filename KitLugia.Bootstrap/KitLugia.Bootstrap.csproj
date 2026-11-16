@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		LAUNCHER / BOOTSTRAPPER DO KITLUGIA
+		====================================
+		Executa em net48 (.NET Framework 4.8) DE PROPÓSITO:
+		o app principal (KitLugia.GUI) é net10.0-windows framework-dependent, ou seja,
+		quando o .NET Desktop Runtime 10 falta na maquina ele NAO abre a tela alguma:
+		o apphost do .NET mostra a mensagem "voce precisa instalar o .NET" e manda
+		para a pagina de download. O .NET Framework 4.8 vem no proprio Windows 10/11,
+		entao este launcher SEMPRE consegue rodar e detectar a falta antes de carregar
+		o WPF — e ai sim oferece baixar e instalar (estilo LuaTools).
+
+		Ele tambem NAO pede elevate: o UAC fica para o instalador oficial da Microsoft
+		e para o app principal (que exige admin). O launcher roda como usuario.
+	-->
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net48</TargetFramework>
+		<UseWPF>true</UseWPF>
+		<AssemblyName>KitLugia</AssemblyName>
+		<RootNamespace>KitLugia.Bootstrap</RootNamespace>
+		<LangVersion>latest</LangVersion>
+		<Nullable>disable</Nullable>
+		<StartupObject>KitLugia.Bootstrap.Program</StartupObject>
+		<CodePage>65001</CodePage>
+		<DebugType>embedded</DebugType>
+		<GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+		<AssemblyTitle>KitLugia Launcher</AssemblyTitle>
+		<Product>KitLugia</Product>
+		<Company>KitLugia</Company>
+		<Description>Launcher do KitLugia: verifica e instala os componentes necessarios (.NET Desktop Runtime / Visual C++) antes de abrir o app.</Description>
+		<Version>2.0.62</Version>
+		<AssemblyVersion>2.0.62.0</AssemblyVersion>
+		<FileVersion>2.0.62.0</FileVersion>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<DefineConstants>DEBUG;TRACE</DefineConstants>
+	</PropertyGroup>
+
+</Project>

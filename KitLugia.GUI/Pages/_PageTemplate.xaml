@@ -19,7 +19,7 @@
      - Fonte: Segoe UI Variable Display (definida no Page-level FontFamily)
      - Cores de status: #6CB55F (ativo/inativo), #888 (padrão), #FFD700 (destaque)
      - Título: FontSize="32" FontWeight="SemiBold"
-     - Subtítulo: Foreground="#A0A0A0"
+     - Subtítulo: Foreground="{DynamicResource TextDescription}"
      - Cards: Padding="15", Margin="0,0,0,15"
      ═══════════════════════════════════════════════════════════════════════ -->
 <Page x:Class="KitLugia.GUI.Pages.SuaPagina"
@@ -34,11 +34,11 @@
 
             <!-- TÍTULO -->
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="T&#xED;tulo da P&#xE1;gina" Margin="0,0,0,10"/>
-            <TextBlock Text="Descri&#xE7;&#xE3;o curta do que esta p&#xE1;gina faz." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+            <TextBlock Text="Descri&#xE7;&#xE3;o curta do que esta p&#xE1;gina faz." Foreground="{DynamicResource TextDescription}" Margin="0,0,0,30"/>
 
             <!-- CARD DE EXEMPLO -->
             <TextBlock Text="Se&#xE7;&#xE3;o" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <!-- ITEM COM TOGGLE -->
                     <Grid Margin="20">
@@ -61,7 +61,7 @@
                         <CheckBox x:Name="ChkToggle" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkToggle_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- ITEM SEM TOGGLE ( informativo ) -->
                     <Grid Margin="20">

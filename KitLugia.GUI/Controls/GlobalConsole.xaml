@@ -38,7 +38,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Background="#0A0A0A" BorderBrush="{StaticResource AccentColor}" BorderThickness="0,1,0,0">
+    <Border Background="#0A0A0A" BorderBrush="{DynamicResource AccentColor}" BorderThickness="0,1,0,0">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="30"/>
@@ -48,7 +48,7 @@
             </Grid.RowDefinitions>
 
             <!-- BARRA DE FERRAMENTAS DO CONSOLE -->
-            <Border Grid.Row="0" Background="#151515" BorderBrush="#333" BorderThickness="0,0,0,1">
+            <Border Grid.Row="0" Background="#151515" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1">
                 <Grid Margin="10,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -62,7 +62,7 @@
                     </StackPanel>
 
                     <!-- Busca -->
-                    <Border Grid.Column="1" Background="#0F0F0F" BorderBrush="#333" BorderThickness="1" CornerRadius="2" Margin="4,0" VerticalAlignment="Center" Height="20">
+                    <Border Grid.Column="1" Background="{DynamicResource Surface0}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="2" Margin="4,0" VerticalAlignment="Center" Height="20">
                         <TextBox x:Name="TxtSearch" Style="{StaticResource SearchInputStyle}"
                                  MinHeight="0" FontFamily="Consolas" FontSize="11" Foreground="#AAA"
                                  Tag="Filtrar log..." TextChanged="TxtSearch_TextChanged"

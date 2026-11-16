@@ -155,7 +155,7 @@ namespace KitLugia.GUI.Pages
         {
             if (LoadingOverlay != null)
             {
-                if (TxtLoadingMsg != null) TxtLoadingMsg.Text = msg;
+                LoadingOverlay.Message = msg;
                 LoadingOverlay.Visibility = isLoading ? Visibility.Visible : Visibility.Collapsed;
             }
         }

@@ -8757,10 +8757,7 @@ namespace KitLugia.Core
             try
             {
                 RemoveTakeOwnershipKit();
-                string exePath = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
-                exePath = System.IO.Path.Combine(exePath, "KitLugia.GUI.exe");
-                if (!System.IO.File.Exists(exePath))
-                    exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                string exePath = AppPaths.GetAppExePathForRegistration();
                 if (string.IsNullOrEmpty(exePath)) return;
 
                 string cmd = $"\"{exePath}\" --takeown \"%1\"";
@@ -8859,10 +8856,7 @@ namespace KitLugia.Core
         {
             try
             {
-                string currentExe = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
-                currentExe = System.IO.Path.Combine(currentExe, "KitLugia.GUI.exe");
-                if (!System.IO.File.Exists(currentExe))
-                    currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                string currentExe = AppPaths.GetAppExePathForRegistration();
                 if (string.IsNullOrEmpty(currentExe)) return;
 
                 // Take Ownership (kittakeown)
@@ -9295,11 +9289,8 @@ namespace KitLugia.Core
                 // Always remove old entries first (prevents duplicates from PowerShell era)
                 RemoveForceStopUnlock();
 
-                // Use the KitLugia executable path for context menu command
-                string exePath = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
-                exePath = System.IO.Path.Combine(exePath, "KitLugia.GUI.exe");
-                if (!System.IO.File.Exists(exePath))
-                    exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                // Use o caminho do executavel do APP para o comando do menu de contexto
+                string exePath = AppPaths.GetAppExePathForRegistration();
                 if (string.IsNullOrEmpty(exePath)) return;
 
                 string cmd = $"\"{exePath}\" --unlock \"%1\"";

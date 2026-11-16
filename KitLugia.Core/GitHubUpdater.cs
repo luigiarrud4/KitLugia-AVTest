@@ -18,6 +18,18 @@ namespace KitLugia.Core
     {
         private static readonly string GitHubRepo = "luigiarrud4/KitLugia-AVTest";
         public static readonly string ApiUrl = $"https://api.github.com/repos/{GitHubRepo}/releases/latest";
+
+        /// <summary>Página do repositório no GitHub (usada pelo botão "Repositório" da tela de Atualizações).</summary>
+        public static readonly string RepoUrl = $"https://github.com/{GitHubRepo}";
+
+        /// <summary>Página de releases do repositório (fallback de download manual).</summary>
+        public static readonly string ReleasesUrl = $"https://github.com/{GitHubRepo}/releases";
+
+        /// <summary>
+        /// Motivo legível da última falha de rede/API/verificação, para a UI mostrar
+        /// algo melhor que "Offline" (ex.: rate limit 403, hash inválido). Null = sem erro.
+        /// </summary>
+        public static string? LastError { get; private set; }
         public static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
 
         // Cache de disco para última release
@@ -141,12 +153,15 @@ namespace KitLugia.Core
         }
 
         /// <summary>
-        /// Obtém a última release do cache ou da API (com fallback offline)
+        /// Obtém a última release do cache ou da API (com fallback offline).
+        /// <paramref name="forceRefresh"/> ignora o cache de memória/disco (TTL 1h) e consulta a API:
+        /// usado pelo botão "Verificar Agora" — sem isso uma release nova só aparecia após o TTL.
+        /// Se a API falhar, ainda cai no último cache conhecido e registra o motivo em <see cref="LastError"/>.
         /// </summary>
-        public static async Task<ReleaseInfo?> GetLatestReleaseAsync()
+        public static async Task<ReleaseInfo?> GetLatestReleaseAsync(bool forceRefresh = false)
         {
             // Cache em memória válido?
-            if (_cachedLatestRelease != null && DateTime.Now < _cacheExpiry)
+            if (!forceRefresh && _cachedLatestRelease != null && DateTime.Now < _cacheExpiry)
             {
                 Logger.Log($"📦 Usando cache de memória ({_cachedLatestRelease.TagName})");
                 return _cachedLatestRelease;
@@ -155,18 +170,26 @@ namespace KitLugia.Core
             try
             {
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
-                var response = await _httpClient.GetAsync(ApiUrl, cts.Token);
+                using var response = await _httpClient.GetAsync(ApiUrl, cts.Token);
                 if (!response.IsSuccessStatusCode)
                 {
+                    int code = (int)response.StatusCode;
+                    LastError = code switch
+                    {
+                        403 or 429 => $"GitHub limitou as requisições ({code}). Tente novamente em alguns minutos.",
+                        404 => "Nenhuma release publicada no repositório (404).",
+                        _ => $"GitHub respondeu {code} ({response.StatusCode})."
+                    };
                     Logger.Log($"❌ API GitHub retornou {response.StatusCode} — usando cache de disco");
                     return _cachedLatestRelease;
                 }
 
-                var json = await response.Content.ReadAsStringAsync();
+                var json = await response.Content.ReadAsStringAsync(cts.Token);
                 var release = JsonSerializer.Deserialize<ReleaseInfo>(json, JsonOptions);
 
                 if (release != null)
                 {
+                    LastError = null;
                     _cachedLatestRelease = release;
                     _cacheExpiry = DateTime.Now.Add(CacheTTL);
                     SaveDiskCache();
@@ -177,6 +200,9 @@ namespace KitLugia.Core
             }
             catch (Exception ex)
             {
+                LastError = ex is TaskCanceledException
+                    ? "Tempo esgotado ao consultar o GitHub (15 s)."
+                    : $"Falha de conexão com o GitHub: {ex.Message}";
                 Logger.Log($"❌ Erro na API: {ex.Message} — usando cache de disco");
                 return _cachedLatestRelease;
             }
@@ -255,46 +281,13 @@ namespace KitLugia.Core
 
                 Logger.Log("✅ Download concluído!");
 
-                // FAIL-CLOSED: sem o .sha256 (ou com um hash invalido) o binario
-                // NAO pode ser extraido/executado. Antes a falha do download era
-                // engolida e a verificacao inteira era pulada silenciosamente.
-                string expectedHash;
-                try
+                // FAIL-CLOSED: sem o .sha256 (ou com hash inválido/divergente) o binário
+                // NÃO pode ser extraído/executado.
+                if (!await VerifyAssetHashAsync(asset, updatePath))
                 {
-                    var hashUrl = asset.BrowserDownloadUrl.Replace(".zip", ".zip.sha256");
-                    using var hashResponse = await _httpClient.GetAsync(hashUrl);
-                    hashResponse.EnsureSuccessStatusCode();
-                    var hashContent = (await hashResponse.Content.ReadAsStringAsync()).Trim();
-                    // Formato sha256sum ("<hash>  <arquivo>") quebrava a comparação:
-                    // fica só com o primeiro token (o hash em si).
-                    var firstToken = hashContent.Split(new[] { ' ', '\t', '\r', '\n' },
-                        StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-                    expectedHash = firstToken ?? "";
-                    Logger.Log($"🔐 SHA256 baixado: {expectedHash}");
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError("Updater", "Nao foi possivel baixar o SHA256: " + ex.Message);
-                    File.Delete(updatePath);
+                    TryDeleteFile(updatePath);
                     return false;
                 }
-
-                if (expectedHash.Length != 64 || !expectedHash.All(Uri.IsHexDigit))
-                {
-                    Logger.LogError("Updater", "SHA256 do release invalido - atualizacao abortada.");
-                    File.Delete(updatePath);
-                    return false;
-                }
-
-                string actualHash = ComputeSha256(updatePath);
-                Logger.Log($"🔐 Hash calculado: {actualHash}");
-                if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
-                {
-                    Logger.Log($"❌ Hash mismatch! Esperado: {expectedHash}, Calculado: {actualHash}");
-                    File.Delete(updatePath);
-                    return false;
-                }
-                Logger.Log("✅ Hash verificado com sucesso!");
 
                 // Extract ZIP in C# so the batch doesn't need PowerShell
                 var extractDir = Path.Combine(tempDir, $"KitLugia_Extract_{DateTime.Now.Ticks}");
@@ -312,9 +305,11 @@ namespace KitLugia.Core
                 }
 
                 int currentPid = Process.GetCurrentProcess().Id;
-                string currentExePath = Environment.ProcessPath
-                    ?? Path.ChangeExtension(Assembly.GetEntryAssembly()?.Location ?? "", ".exe")
-                    ?? AppContext.BaseDirectory.TrimEnd('\\') + "\\KitLugia.GUI.exe";
+                string currentExePath = Environment.ProcessPath ?? "";
+                if (string.IsNullOrEmpty(currentExePath))
+                    currentExePath = AppPaths.GetRunningExePath();
+                if (string.IsNullOrEmpty(currentExePath))
+                    currentExePath = AppPaths.ResolveAppExePath(AppContext.BaseDirectory) ?? "";
                 if (currentExePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                     currentExePath = Path.ChangeExtension(currentExePath, ".exe");
                 string currentDir = Path.GetDirectoryName(currentExePath) ?? AppContext.BaseDirectory;
@@ -347,6 +342,61 @@ namespace KitLugia.Core
                 Logger.Log($"❌ Erro na atualização: {ex.Message}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Baixa o .sha256 publicado junto do asset e compara com o SHA-256 do arquivo local.
+        /// Fail-closed: qualquer falha (download, formato, divergência) retorna false e preenche
+        /// <see cref="LastError"/>. Compartilhado pelos DOIS fluxos de atualização — antes só o
+        /// fluxo de linha de comando verificava; o botão "Atualizar Agora" da UI instalava sem checar.
+        /// </summary>
+        private static async Task<bool> VerifyAssetHashAsync(Asset asset, string filePath)
+        {
+            string expectedHash;
+            try
+            {
+                var hashUrl = asset.BrowserDownloadUrl.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+                    ? asset.BrowserDownloadUrl + ".sha256"
+                    : asset.BrowserDownloadUrl.Replace(".zip", ".zip.sha256");
+                using var hashResponse = await _httpClient.GetAsync(hashUrl);
+                hashResponse.EnsureSuccessStatusCode();
+                var hashContent = (await hashResponse.Content.ReadAsStringAsync()).Trim();
+                // Formato sha256sum ("<hash>  <arquivo>"): fica só com o primeiro token.
+                expectedHash = hashContent.Split(new[] { ' ', '\t', '\r', '\n' },
+                    StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+                Logger.Log($"🔐 SHA256 baixado: {expectedHash}");
+            }
+            catch (Exception ex)
+            {
+                LastError = "Não foi possível baixar o arquivo .sha256 da release.";
+                Logger.LogError("Updater", "Nao foi possivel baixar o SHA256: " + ex.Message);
+                return false;
+            }
+
+            if (expectedHash.Length != 64 || !expectedHash.All(Uri.IsHexDigit))
+            {
+                LastError = "O .sha256 da release é inválido.";
+                Logger.LogError("Updater", "SHA256 do release invalido - atualizacao abortada.");
+                return false;
+            }
+
+            string actualHash = ComputeSha256(filePath);
+            Logger.Log($"🔐 Hash calculado: {actualHash}");
+            if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+            {
+                LastError = "O hash do arquivo baixado não confere com o da release (download corrompido ou adulterado).";
+                Logger.Log($"❌ Hash mismatch! Esperado: {expectedHash}, Calculado: {actualHash}");
+                return false;
+            }
+
+            Logger.Log("✅ Hash verificado com sucesso!");
+            return true;
+        }
+
+        private static void TryDeleteFile(string path)
+        {
+            try { if (File.Exists(path)) File.Delete(path); }
+            catch { /* em uso — será limpo pela rotina de temporários antigos */ }
         }
 
         private static Version GetCurrentVersion()
@@ -408,6 +458,7 @@ namespace KitLugia.Core
         {
             try
             {
+                LastError = null;
                 var tempDir = Path.GetTempPath();
                 var zipPath = Path.Combine(tempDir, "KitLugia_Update.zip");
 
@@ -419,24 +470,35 @@ namespace KitLugia.Core
                 response.EnsureSuccessStatusCode();
 
                 var totalBytes = response.Content.Headers.ContentLength ?? asset.Size;
-                await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-                await using var fileStream = File.Create(zipPath);
-
-                var buffer = new byte[81920];
-                long bytesRead = 0;
-                int bytesJustRead;
-                while ((bytesJustRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
+                // Bloco próprio: os streams precisam estar FECHADOS antes de calcular o hash.
                 {
-                    await fileStream.WriteAsync(buffer, 0, bytesJustRead, ct);
-                    bytesRead += bytesJustRead;
-                    progress?.Report((bytesRead, totalBytes));
+                    await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
+                    await using var fileStream = File.Create(zipPath);
+
+                    var buffer = new byte[81920];
+                    long bytesRead = 0;
+                    int bytesJustRead;
+                    while ((bytesJustRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
+                    {
+                        await fileStream.WriteAsync(buffer, 0, bytesJustRead, ct);
+                        bytesRead += bytesJustRead;
+                        progress?.Report((bytesRead, totalBytes));
+                    }
                 }
 
                 Logger.Log($"✅ Download concluído via DownloadUpdateFileAsync: {zipPath}");
+
+                if (!await VerifyAssetHashAsync(asset, zipPath))
+                {
+                    TryDeleteFile(zipPath);
+                    return null;
+                }
+
                 return zipPath;
             }
             catch (Exception ex)
             {
+                LastError = $"Falha no download: {ex.Message}";
                 Logger.Log($"❌ Erro no download com progresso: {ex.Message}");
                 return null;
             }
@@ -457,6 +519,21 @@ del /q ""{zipPath}"" >nul 2>&1
 echo.
 ";
 
+                // Remove o executavel com o NOME ANTIGO (KitLugia.GUI.exe) quando o
+                // app em uso ja tem o nome novo (KitLugia.App.exe) — senao a
+                // atualizacao deixa 54 MB do executavel velho jogados na pasta.
+                // Se o app em uso AINDA e' o nome antigo, nao apaga nada.
+                string legacyCleanup = "";
+                try
+                {
+                    string currentFileName = Path.GetFileName(exePath);
+                    if (!string.Equals(currentFileName, AppPaths.LegacyAppExeFileName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        legacyCleanup = $"if exist \"%~dp0{AppPaths.LegacyAppExeFileName}\" del /q \"%~dp0{AppPaths.LegacyAppExeFileName}\" >nul 2>&1\r\n";
+                    }
+                }
+                catch { }
+
                 string batch = $@"@echo off
 title KitLugia - Atualizando...
 color 0E
@@ -476,6 +553,7 @@ timeout /t 1 /nobreak >nul
 goto wait
 :waittimeout
 echo  AVISO - KitLugia nao fechou em 120 s. NADA foi alterado; abortando.
+echo %date% %time% ATUALIZACAO ABORTADA (app nao fechou) old={oldVersion} new={newVersion} >> ""%LOCALAPPDATA%\KitLugia\Logs\update.log"" 2>nul
 timeout /t 10 >nul
 exit /b 2
 :closed
@@ -485,17 +563,19 @@ echo [2/3] Instalando arquivos...
 xcopy ""{extractDir}"" ""{appDir}"" /E /Y /Q
 if errorlevel 1 (
     echo  ERRO - Falha ao copiar arquivos. A versao antiga continua intacta.
+    echo %date% %time% ATUALIZACAO FALHOU xcopy old={oldVersion} new={newVersion} >> ""%LOCALAPPDATA%\KitLugia\Logs\update.log"" 2>nul
     timeout /t 10 >nul
     exit /b 1
 )
 echo  OK - Arquivos instalados.
-echo.
+{legacyCleanup}echo.
 {cleanup}echo [3/3] Iniciando nova versao...
 start """" ""{exePath}""
 echo.
 echo ================================================
 echo     ATUALIZACAO CONCLUIDA!
 echo ================================================
+echo %date% %time% ATUALIZACAO OK old={oldVersion} new={newVersion} >> ""%LOCALAPPDATA%\KitLugia\Logs\update.log"" 2>nul
 timeout /t 5 >nul
 exit /b 0
 ";

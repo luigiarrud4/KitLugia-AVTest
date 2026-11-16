@@ -7,7 +7,7 @@
     <!-- Fundo escurecido -->
     <Grid Background="#CC000000">
         <!-- Painel central -->
-        <Border Background="#1A1A1A" BorderBrush="#FFD700" BorderThickness="1"
+        <Border Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1"
                 CornerRadius="10" Width="580" MaxHeight="640"
                 HorizontalAlignment="Center" VerticalAlignment="Center">
             <Border.Effect>
@@ -30,7 +30,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="&#x1F4BE; Selecionar Processo para Monitorar"
-                                       FontSize="15" FontWeight="Bold" Foreground="#FFD700"/>
+                                       FontSize="15" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
                             <TextBlock Text="Escolha um ou mais processos. Segure Ctrl para selecionar v&#xE1;rios."
                                        FontSize="11" Foreground="#888" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             <TextBlock FontSize="10" Foreground="#666" Margin="0,2,0,0">
@@ -95,7 +95,7 @@
                                 <TextBlock Text="Limite de RAM:" Foreground="#666"
                                            FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <TextBox x:Name="TxtLimitMB" Text="500" Width="70"
-                                         Background="#252525" Foreground="White"
+                                         Background="{DynamicResource Surface2}" Foreground="White"
                                          BorderBrush="#444" BorderThickness="1"
                                          Padding="6,4" FontSize="12" VerticalAlignment="Center"/>
                                 <TextBlock Text=" MB" Foreground="#666" FontSize="11"

@@ -9,57 +9,9 @@
       Title="IsoEditor"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
-    <Page.Resources>
-        <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="30" />
-                </Grid.ColumnDefinitions>
-                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
-                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L4,4 L8,0" IsHitTestVisible="False"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Border" Property="Background" Value="#333333" />
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
-
-        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#1A1A1A"/>
-            <Setter Property="BorderBrush" Value="#444444"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Setter Property="OverridesDefaultStyle" Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ComboBox}">
-                        <Grid>
-                            <ToggleButton Name="ToggleButton" Template="{StaticResource ComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
-                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
-                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="#1A1A1A" BorderThickness="1" BorderBrush="#444444"/>
-                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                    </ScrollViewer>
-                                </Grid>
-                            </Popup>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="DarkCheckBoxStyle" TargetType="CheckBox">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Margin" Value="0,10"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontWeight" Value="Normal"/>
-        </Style>
-    </Page.Resources>
+    <!-- DarkCheckBoxStyle removido: o CheckBox implicito do tema (Themes/CheckBox.xaml)
+         ja da Foreground branco, cursor de mao e o template do kit. O unico extra
+         local era Margin="0,10", migrado para cada CheckBox. -->
 
     <Grid Margin="30">
         <Grid.RowDefinitions>
@@ -72,47 +24,47 @@
         <StackPanel Orientation="Horizontal" Margin="0,0,0,30">
             <TextBlock Text="&#x1F4BF;" FontSize="32" Margin="0,0,15,0" VerticalAlignment="Center"/>
             <StackPanel>
-                <TextBlock Text="KIT ISO EDITOR" FontSize="26" FontWeight="ExtraBold" Foreground="{StaticResource AccentColor}"/>
-                <TextBlock Text="Editor de ISO Rapido (wimlib) - Debloat, Features e Redu&#xE7;&#xE3;o de Tamanho" FontSize="12" Foreground="{StaticResource TextMuted}" Opacity="0.8"/>
+                <TextBlock Text="KIT ISO EDITOR" FontSize="26" FontWeight="ExtraBold" Foreground="{DynamicResource AccentColor}"/>
+                <TextBlock Text="Editor de ISO Rapido (wimlib) - Debloat, Features e Redu&#xE7;&#xE3;o de Tamanho" FontSize="12" Foreground="{DynamicResource TextMuted}" Opacity="0.8"/>
             </StackPanel>
         </StackPanel>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
             <StackPanel>
                 <!-- ISO Selection Card -->
-                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource SubtleCardStyle}">
+                <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="25" Margin="0,0,0,20" Style="{StaticResource SubtleCardStyle}">
                     <StackPanel>
-                        <TextBlock Text="&#x1F4C0; IMAGEM ISO" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
-                        <TextBlock Text="Selecione o arquivo ISO de instala&#xE7;&#xE3;o:" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+                        <TextBlock Text="&#x1F4C0; IMAGEM ISO" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,15"/>
+                        <TextBlock Text="Selecione o arquivo ISO de instala&#xE7;&#xE3;o:" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,5"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBox x:Name="TxtIsoPath" Height="40" VerticalContentAlignment="Center"
-                                     Background="#1A1A1A" Foreground="#FFFFFF" BorderThickness="1" BorderBrush="#444444" Padding="15,0" IsReadOnly="True"
+                                     Background="{DynamicResource Surface1}" Foreground="#FFFFFF" BorderThickness="1" BorderBrush="#444444" Padding="15,0" IsReadOnly="True"
                                      TextChanged="TxtIsoPath_TextChanged"/>
                             <Button Grid.Column="1" Content="BUSCAR ISO" Padding="20,0" Margin="10,0,0,0" Click="BtnSelectIso_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                         </Grid>
-                        <TextBlock x:Name="TxtDetectedIsoType" Text="" FontSize="11" Foreground="{StaticResource AccentColor}" Margin="0,5,0,0" FontWeight="Bold"/>
+                        <TextBlock x:Name="TxtDetectedIsoType" Text="" FontSize="11" Foreground="{DynamicResource AccentColor}" Margin="0,5,0,0" FontWeight="Bold"/>
                         <Button x:Name="BtnAnalyzeIso" Content="&#x1F50D; ANALISAR EDI&#xC7;&#xD5;ES (wimlib)" Margin="0,15,0,0" Height="36" Click="BtnAnalyzeIso_Click" Style="{StaticResource SecondaryButtonStyle}" IsEnabled="False"/>
-                        <TextBlock x:Name="TxtAnalysisResult" Text="" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="TxtAnalysisResult" Text="" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,6,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Help Section -->
                 <Border Background="#0AFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,20" Style="{StaticResource SubtleCardStyle}">
                     <StackPanel>
-                        <TextBlock Text="&#x2754; COMO FUNCIONA O ISO EDITOR" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
-                        <TextBlock Text="1. Sele&#xE7;&#xE3;o: Escolha o arquivo ISO de instala&#xE7;&#xE3;o do Windows." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
-                        <TextBlock Text="2. An&#xE1;lise: wimlib lista as edi&#xE7;&#xF5;es (indices) em 1-2s, sem montar nada." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
-                        <TextBlock Text="3. Configura&#xE7;&#xE3;o: strip de edi&#xE7;&#xE3;o, tweaks de registro e arquivos soltos (r&#xE1;pido) / drivers+AppX (lento)." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
-                        <TextBlock Text="4. Cria&#xE7;&#xE3;o: ISO final boot&#xE1;vel (BIOS+UEFI) via oscdimg, com as modifica&#xE7;&#xF5;es aplicadas." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="&#x2754; COMO FUNCIONA O ISO EDITOR" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,10"/>
+                        <TextBlock Text="1. Sele&#xE7;&#xE3;o: Escolha o arquivo ISO de instala&#xE7;&#xE3;o do Windows." Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="2. An&#xE1;lise: wimlib lista as edi&#xE7;&#xF5;es (indices) em 1-2s, sem montar nada." Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="3. Configura&#xE7;&#xE3;o: strip de edi&#xE7;&#xE3;o, tweaks de registro e arquivos soltos (r&#xE1;pido) / drivers+AppX (lento)." Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="4. Cria&#xE7;&#xE3;o: ISO final boot&#xE1;vel (BIOS+UEFI) via oscdimg, com as modifica&#xE7;&#xF5;es aplicadas." Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="0,0,0,3"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Expandable Detailed Log -->
-                <Expander Header="LOG DETALHADO (DIAGN&#xD3;STICO E EXECU&#xC7;&#xC3;O)" Background="Transparent" Foreground="{StaticResource TextMuted}" Margin="0,0,0,20">
+                <Expander Header="LOG DETALHADO (DIAGN&#xD3;STICO E EXECU&#xC7;&#xC3;O)" Background="Transparent" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,20">
                     <Border Background="#05000000" CornerRadius="8" Padding="10" Margin="0,5,0,0" BorderBrush="#11FFFFFF" BorderThickness="1">
                         <TextBox x:Name="TxtLogViewer" Height="150" Background="Transparent" Foreground="#88FFFFFF" 
                                  BorderThickness="0" FontFamily="Consolas" TextWrapping="Wrap" IsReadOnly="True"
@@ -123,7 +75,7 @@
                 <!-- Status Monitor -->
                 <Border Background="#11D4AF37" BorderBrush="#33D4AF37" BorderThickness="1" CornerRadius="5" Padding="15" Margin="0,0,0,15">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Status:" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,10,0"/>
+                        <TextBlock Text="Status:" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,10,0"/>
                         <TextBlock x:Name="TxtStatus" Text="Aguardando in&#xED;cio..." Foreground="White"/>
                     </StackPanel>
                 </Border>
@@ -131,7 +83,7 @@
         </ScrollViewer>
 
         <!-- Footer Actions -->
-        <Border Grid.Row="2" Background="{StaticResource CardBackground}" Margin="-30,20,-30,-30" Padding="30">
+        <Border Grid.Row="2" Background="{DynamicResource CardBackground}" Margin="-30,20,-30,-30" Padding="30">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -139,8 +91,8 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <TextBlock x:Name="TxtModeHint" Text="Modo: Rapido (wimlib, sem montar)" FontSize="11" Foreground="{StaticResource AccentColor}"/>
-                    <TextBlock Text="Certifique-se de que possui backup da ISO original." FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                    <TextBlock x:Name="TxtModeHint" Text="Modo: Rapido (wimlib, sem montar)" FontSize="11" Foreground="{DynamicResource AccentColor}"/>
+                    <TextBlock Text="Certifique-se de que possui backup da ISO original." FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -154,7 +106,7 @@
 
         <!-- Overlay de Configura&#xE7;&#xE3;o -->
         <Border x:Name="OverlayConfig" Grid.Row="0" Grid.RowSpan="2" Background="#CC000000" Visibility="Collapsed">
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="15" MaxWidth="780" MaxHeight="700" Margin="50" VerticalAlignment="Center">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="15" MaxWidth="780" MaxHeight="700" Margin="50" VerticalAlignment="Center">
                 <Border.Effect>
                     <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="10" Opacity="0.5"/>
                 </Border.Effect>
@@ -171,25 +123,25 @@
 
                     <!-- Info da ISO -->
                     <Border Grid.Row="1" Background="#2A2A2A" Padding="15" CornerRadius="5" Margin="0,0,0,15">
-                        <TextBlock x:Name="TxtConfigIsoInfo" Text="ISO n&#xE3;o selecionada" Foreground="#FFD700" FontSize="13" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="TxtConfigIsoInfo" Text="ISO n&#xE3;o selecionada" Foreground="{DynamicResource AccentColor}" FontSize="13" TextWrapping="Wrap"/>
                     </Border>
 
                     <!-- Checkboxes de Op&#xE7;&#xF5;es -->
                     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <!-- Destino da ISO -->
-                            <TextBlock Text="&#x1F4C1; DESTINO DA ISO" FontSize="13" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,10"/>
+                            <TextBlock Text="&#x1F4C1; DESTINO DA ISO" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,10"/>
                             <Grid Margin="0,0,0,20">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="TxtIsoDest" Grid.Column="0" Text="Caminho da ISO final..." Foreground="Gray" IsReadOnly="True" Background="#2A2A2A" BorderBrush="#444" Padding="8"/>
-                                <Button x:Name="BtnSelectIsoDest" Grid.Column="1" Content="&#x1F4C2;" Click="BtnSelectIsoDest_Click" Width="40" Margin="10,0,0,0" Background="#2A2A2A" BorderBrush="#FFD700" Foreground="#FFD700" Cursor="Hand"/>
+                                <Button x:Name="BtnSelectIsoDest" Grid.Column="1" Content="&#x1F4C2;" Click="BtnSelectIsoDest_Click" Width="40" Margin="10,0,0,0" Background="#2A2A2A" BorderBrush="{DynamicResource AccentColor}" Foreground="{DynamicResource AccentColor}" Cursor="Hand"/>
                             </Grid>
 
                             <!-- Edi&#xE7;&#xE3;o e Compress&#xE3;o (Modo Rapido) -->
-                            <TextBlock Text="&#x1F504; EDI&#xC7;&#xC3;O &amp; COMPRESS&#xC3;O (wimlib - R&#xC1;PIDO)" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,0,0,10"/>
+                            <TextBlock Text="&#x1F504; EDI&#xC7;&#xC3;O &amp; COMPRESS&#xC3;O (wimlib - R&#xC1;PIDO)" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" Margin="0,0,0,10"/>
                             <Grid Margin="0,0,0,5">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -197,8 +149,8 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Edi&#xE7;&#xE3;o a manter (strip da ISO multi-edi&#xE7;&#xE3;o):" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,5"/>
-                                    <ComboBox x:Name="ComboEditions" Height="38" Style="{StaticResource DarkComboBoxStyle}">
+                                    <TextBlock Text="Edi&#xE7;&#xE3;o a manter (strip da ISO multi-edi&#xE7;&#xE3;o):" Foreground="{DynamicResource TextSecondary}" FontSize="11" Margin="0,0,0,5"/>
+                                    <ComboBox x:Name="ComboEditions" Height="38">
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="{Binding}" Foreground="White" Padding="5"/>
@@ -207,55 +159,55 @@
                                     </ComboBox>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Compress&#xE3;o (ap&#xF3;s export):" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,5"/>
-                                    <ComboBox x:Name="ComboCompression" Height="38" SelectedIndex="1" Style="{StaticResource DarkComboBoxStyle}">
+                                    <TextBlock Text="Compress&#xE3;o (ap&#xF3;s export):" Foreground="{DynamicResource TextSecondary}" FontSize="11" Margin="0,0,0,5"/>
+                                    <ComboBox x:Name="ComboCompression" Height="38" SelectedIndex="1">
                                         <ComboBoxItem Content="LZMS (m&#xE1;xima redu&#xE7;&#xE3;o, mais lento)"/>
                                         <ComboBoxItem Content="LZX (balanceado, r&#xE1;pido - recomendado)"/>
                                     </ComboBox>
                                 </StackPanel>
                             </Grid>
-                            <CheckBox x:Name="ChkStripEdition" Content="Manter apenas a edi&#xE7;&#xE3;o acima e recomprimir (export via wimlib, sem montar)" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <TextBlock Text="ESD tamb&#xE9;m vira install.wim normal aqui (permite tweaks depois). R&#xE1;pido." Foreground="#4CAF50" FontSize="11" Margin="25,0,0,15"/>
+                            <CheckBox x:Name="ChkStripEdition" Content="Manter apenas a edi&#xE7;&#xE3;o acima e recomprimir (export via wimlib, sem montar)" Margin="0,10"/>
+                            <TextBlock Text="ESD tamb&#xE9;m vira install.wim normal aqui (permite tweaks depois). R&#xE1;pido." Foreground="{DynamicResource SuccessBrush}" FontSize="11" Margin="25,0,0,15"/>
 
                             <!-- Tweaks de registro (Modo Rapido) -->
-                            <TextBlock Text="&#x2699;&#xFE0F; TWEAKS DE REGISTRO (wimlib - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
-                            <CheckBox x:Name="ChkBypassRequirements" Content="Bypass de Requisitos de Sistema (TPM, CPU, RAM, Secure Boot)" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <CheckBox x:Name="ChkDisableTelemetry" Content="Desabilitar Telemetria" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <CheckBox x:Name="ChkDisableOneDrive" Content="Desabilitar OneDrive" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <CheckBox x:Name="ChkDisableCopilot" Content="Desabilitar Copilot" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <CheckBox x:Name="ChkRemoveAI" Content="Desabilitar Copilot e Windows Recall (reg. no-mount, SEM DISM)" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <TextBlock Text="&#x2699;&#xFE0F; TWEAKS DE REGISTRO (wimlib - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" Margin="0,5,0,10"/>
+                            <CheckBox x:Name="ChkBypassRequirements" Content="Bypass de Requisitos de Sistema (TPM, CPU, RAM, Secure Boot)" Margin="0,10"/>
+                            <CheckBox x:Name="ChkDisableTelemetry" Content="Desabilitar Telemetria" Margin="0,10"/>
+                            <CheckBox x:Name="ChkDisableOneDrive" Content="Desabilitar OneDrive" Margin="0,10"/>
+                            <CheckBox x:Name="ChkDisableCopilot" Content="Desabilitar Copilot" Margin="0,10"/>
+                            <CheckBox x:Name="ChkRemoveAI" Content="Desabilitar Copilot e Windows Recall (reg. no-mount, SEM DISM)" Margin="0,10"/>
                             <TextBlock Text="Pol&#xED;ticas TurnOffWindowsCopilot + DisableAIDataAnalysis (24H2/25H2) - r&#xE1;pido, via wimlib" Foreground="#AAA" FontSize="11" Margin="25,0,0,10"/>
-                            <CheckBox x:Name="ChkDisableBitLocker" Content="Desabilitar BitLocker" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <CheckBox x:Name="ChkDisableReservedStorage" Content="Desabilitar Reserved Storage" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkDisableBitLocker" Content="Desabilitar BitLocker" Margin="0,10"/>
+                            <CheckBox x:Name="ChkDisableReservedStorage" Content="Desabilitar Reserved Storage" Margin="0,10"/>
 
                             <!-- Arquivos soltos (Modo Rapido) -->
-                            <TextBlock Text="&#x1F4C2; ARQUIVOS SOLTOS (wimlib - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
-                            <CheckBox x:Name="ChkDisableSponsoredApps" Content="Desabilitar Apps Patrocinados (ei.cfg sem vers&#xE3;o/edition + setup)" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <CheckBox x:Name="ChkRemoveDefaultStorePackages" Content="Remover apps padr&#xE3;o da Store (pol&#xED;tica RemoveDefaultMicrosoftStorePackages - 24H2/25H2)" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <CheckBox x:Name="ChkDisableChat" Content="Desabilitar &#xCD;cone do Chat" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <CheckBox x:Name="ChkRemoveSupportFolder" Content="Remover Pasta Support\" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <TextBlock Text="&#x26A0;&#xFE0F; Chat/patrocinados aplicados via registro+arquivos soltos (r&#xE1;pido, no-mount)." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="25,0,0,15"/>
+                            <TextBlock Text="&#x1F4C2; ARQUIVOS SOLTOS (wimlib - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" Margin="0,5,0,10"/>
+                            <CheckBox x:Name="ChkDisableSponsoredApps" Content="Desabilitar Apps Patrocinados (ei.cfg sem vers&#xE3;o/edition + setup)" Margin="0,10"/>
+                            <CheckBox x:Name="ChkRemoveDefaultStorePackages" Content="Remover apps padr&#xE3;o da Store (pol&#xED;tica RemoveDefaultMicrosoftStorePackages - 24H2/25H2)" Margin="0,10"/>
+                            <CheckBox x:Name="ChkDisableChat" Content="Desabilitar &#xCD;cone do Chat" Margin="0,10"/>
+                            <CheckBox x:Name="ChkRemoveSupportFolder" Content="Remover Pasta Support\" Margin="0,10"/>
+                            <TextBlock Text="&#x26A0;&#xFE0F; Chat/patrocinados aplicados via registro+arquivos soltos (r&#xE1;pido, no-mount)." Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="25,0,0,15"/>
 
                             <!-- Automacao pos-setup (2026) -->
-                            <TextBlock Text="&#x1F916; AUTOMA&#xC7;&#xC3;O P&#xD3;S-SETUP (2026 - wimlib - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
-                            <CheckBox x:Name="ChkSetupComplete" Content="SetupComplete.cmd: rodar KitLugiaSetup automaticamente no 1&#xBA; boot (p&#xF3;s-setup, SYSTEM)" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <CheckBox x:Name="ChkConXLegacyFix" Content="Fix Setup 24H2/25H2 (ConX): for&#xE7;ar setup.exe com /legacy no boot.wim" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <TextBlock Text="SetupComplete.cmd (MS Learn 2026) roda com privil&#xE9;gio SYSTEM logo ap&#xF3;s o setup; o fix ConX restaura instala&#xE7;&#xE3;o desatendida nas vers&#xF5;es 24H2/25H2." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="25,0,0,15"/>
+                            <TextBlock Text="&#x1F916; AUTOMA&#xC7;&#xC3;O P&#xD3;S-SETUP (2026 - wimlib - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" Margin="0,5,0,10"/>
+                            <CheckBox x:Name="ChkSetupComplete" Content="SetupComplete.cmd: rodar KitLugiaSetup automaticamente no 1&#xBA; boot (p&#xF3;s-setup, SYSTEM)" Margin="0,10"/>
+                            <CheckBox x:Name="ChkConXLegacyFix" Content="Fix Setup 24H2/25H2 (ConX): for&#xE7;ar setup.exe com /legacy no boot.wim" Margin="0,10"/>
+                            <TextBlock Text="SetupComplete.cmd (MS Learn 2026) roda com privil&#xE9;gio SYSTEM logo ap&#xF3;s o setup; o fix ConX restaura instala&#xE7;&#xE3;o desatendida nas vers&#xF5;es 24H2/25H2." Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="25,0,0,15"/>
 
                             <!-- Op&#xE7;&#xF5;es de customiza&#xE7;&#xE3;o (wimlib + pnputil, SEM montar) -->
-                            <TextBlock Text="&#x23F3; CUSTOMIZA&#xC7;&#xC3;O (wimlib + pnputil - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,5,0,10"/>
-                            <CheckBox x:Name="ChkInjectDrivers" Content="Injetar Drivers do Sistema Atual" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <TextBlock Text="&#x23F3; CUSTOMIZA&#xC7;&#xC3;O (wimlib + pnputil - SEM MONTAR)" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" Margin="0,5,0,10"/>
+                            <CheckBox x:Name="ChkInjectDrivers" Content="Injetar Drivers do Sistema Atual" Margin="0,10"/>
                             <TextBlock Text="Exporta drivers do sistema (pnputil) para $WinPEDriver$ - o Setup.exe do WinPE injeta no driverstore" Foreground="#AAA" FontSize="11" Margin="25,0,0,10"/>
-                            <CheckBox x:Name="ChkDebloatPreset" Content="Remover Bloatware (AppX)" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <CheckBox x:Name="ChkDebloatPreset" Content="Remover Bloatware (AppX)" Margin="0,10"/>
                             <TextBlock Text="Remove 40+ apps bloatware: Copilot, Xbox, Clipchamp, Bing, Solitaire, Phone Link, etc." Foreground="#AAA" FontSize="11" Margin="25,0,0,10"/>
-                            <CheckBox x:Name="ChkCleanupWinSxS" Content="Otimizar WIM (wimlib optimize - remove espaco dos updates)" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <TextBlock Text="Reconstrucao estrutural em segundos (sem recompressao - o export ja comprimiu)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="25,0,0,5"/>
+                            <CheckBox x:Name="ChkCleanupWinSxS" Content="Otimizar WIM (wimlib optimize - remove espaco dos updates)" Margin="0,10"/>
+                            <TextBlock Text="Reconstrucao estrutural em segundos (sem recompressao - o export ja comprimiu)" Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="25,0,0,5"/>
 
                             <!-- Outras op&#xE7;&#xF5;es (mista) -->
-                            <TextBlock Text="&#x1F4C1; OUTRAS OP&#xC7;&#xD5;ES" FontSize="13" FontWeight="Bold" Foreground="#FFD700" Margin="0,5,0,5"/>
-                            <CheckBox x:Name="ChkDisableUpdateOOBE" Content="Desabilitar Windows Update no OOBE" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <CheckBox x:Name="ChkDisableTeams" Content="Prevenir Instala&#xE7;&#xE3;o do Teams" Style="{StaticResource DarkCheckBoxStyle}"/>
-                            <CheckBox x:Name="ChkDisableOutlook" Content="Prevenir Instala&#xE7;&#xE3;o do Novo Outlook" Style="{StaticResource DarkCheckBoxStyle}"/>
+                            <TextBlock Text="&#x1F4C1; OUTRAS OP&#xC7;&#xD5;ES" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,5,0,5"/>
+                            <CheckBox x:Name="ChkDisableUpdateOOBE" Content="Desabilitar Windows Update no OOBE" Margin="0,10"/>
+                            <CheckBox x:Name="ChkDisableTeams" Content="Prevenir Instala&#xE7;&#xE3;o do Teams" Margin="0,10"/>
+                            <CheckBox x:Name="ChkDisableOutlook" Content="Prevenir Instala&#xE7;&#xE3;o do Novo Outlook" Margin="0,10"/>
 
                             <!-- Bot&#xF5;es de Sele&#xE7;&#xE3;o R&#xE1;pida -->
                             <Grid Margin="0,15,0,0">
@@ -280,7 +232,7 @@
 
         <!-- KIT ISO STUDIO — Expansor (cobre o kit inteiro, nítido, sem blur) -->
         <Border x:Name="OverlayIsoStudio" Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Grid.ColumnSpan="2" Background="#FF0A0A0A" Visibility="Collapsed" Panel.ZIndex="100" Margin="-30" TextOptions.TextFormattingMode="Display" SnapsToDevicePixels="True">
-            <Border Background="#0F0F0F" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="0" Margin="0" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+            <Border Background="{DynamicResource Surface0}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="0" Margin="0" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -289,7 +241,7 @@
                     </Grid.RowDefinitions>
 
                     <!-- Header Studio -->
-                    <Border Background="#1A1A1A" CornerRadius="14,14,0,0" Padding="18" BorderBrush="#222" BorderThickness="0,0,0,1">
+                    <Border Background="{DynamicResource Surface1}" CornerRadius="14,14,0,0" Padding="18" BorderBrush="#222" BorderThickness="0,0,0,1">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -298,15 +250,15 @@
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="🧬" FontSize="22" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBlock Text="KIT ISO STUDIO" FontSize="18" FontWeight="ExtraBold" Foreground="#FFD700" VerticalAlignment="Center"/>
-                                    <Border Background="#FFD700" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="KIT ISO STUDIO" FontSize="18" FontWeight="ExtraBold" Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center"/>
+                                    <Border Background="{DynamicResource AccentColor}" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
                                         <TextBlock Text="EXPANSOR" FontSize="11" FontWeight="Bold" Foreground="Black"/>
                                     </Border>
                                 </StackPanel>
                                 <TextBlock Text="Expansor integrado — foge do estilo do kit para caber dezenas de personalizações reais da ISO" FontSize="11" Foreground="#AAA" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="ⓘ" FontSize="16" Foreground="#FFD700" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Este painel usa layout expandido (2 colunas, scroll, cards) para comportar muito mais opções que o card padrão do kit"/>
+                                <TextBlock Text="ⓘ" FontSize="16" Foreground="{DynamicResource AccentColor}" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Este painel usa layout expandido (2 colunas, scroll, cards) para comportar muito mais opções que o card padrão do kit"/>
                                 <Button Content="✕" Width="32" Height="32" Click="BtnCloseIsoStudio_Click" Background="#222" Foreground="White" BorderThickness="0" Cursor="Hand" FontSize="13" ToolTip="Fechar"/>
                             </StackPanel>
                         </Grid>
@@ -322,9 +274,9 @@
 
                             <!-- Coluna Esquerda -->
                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
+                                <Border Background="{DynamicResource Surface1}" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
                                     <StackPanel>
-                                        <TextBlock Text="🧩 AppX Granular (40+ pacotes)" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
+                                        <TextBlock Text="🧩 AppX Granular (40+ pacotes)" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,0,8"/>
                                         <TextBlock Text="Desmarque individualmente — muito além do preset &quot;Remover Bloatware&quot;" FontSize="11" Foreground="#888" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                         <WrapPanel>
                                             <CheckBox Content="Copilot" IsChecked="True" Margin="0,0,10,6" Foreground="White" FontSize="11"/>
@@ -342,16 +294,16 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
+                                <Border Background="{DynamicResource Surface1}" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
                                     <StackPanel>
-                                        <TextBlock Text="💾 Drivers &amp; Boot" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
+                                        <TextBlock Text="💾 Drivers &amp; Boot" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,0,8"/>
                                         <TextBlock Text="Injeção real via $WinPEDriver$ + boot BIOS+UEFI" FontSize="11" Foreground="#888" Margin="0,0,0,8"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBox x:Name="TxtStudioDriverFolder" IsReadOnly="True" Text="Nenhuma pasta selecionada" Background="#111" Foreground="#888" BorderBrush="#333" Padding="8" Height="30" VerticalContentAlignment="Center"/>
+                                            <TextBox x:Name="TxtStudioDriverFolder" IsReadOnly="True" Text="Nenhuma pasta selecionada" Background="#111" Foreground="#888" BorderBrush="{DynamicResource BorderSubtle}" Padding="8" Height="30" VerticalContentAlignment="Center"/>
                                             <Button Grid.Column="1" Content="📁" Width="36" Height="30" Margin="6,0,0,0" Click="BtnStudioPickDriverFolder_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                                         </Grid>
                                         <CheckBox x:Name="ChkStudioInjectDrivers" Content="Injetar drivers desta pasta na ISO" Margin="0,8,0,0" Foreground="White" FontSize="11"/>
@@ -359,9 +311,9 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" BorderBrush="#2A2A2A" BorderThickness="1">
+                                <Border Background="{DynamicResource Surface1}" CornerRadius="10" Padding="14" BorderBrush="#2A2A2A" BorderThickness="1">
                                     <StackPanel>
-                                        <TextBlock Text="🗂️ Arquivos OEM &amp; Support" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
+                                        <TextBlock Text="🗂️ Arquivos OEM &amp; Support" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,0,8"/>
                                         <CheckBox Content="Remover Support\" Margin="0,0,0,6" Foreground="White" FontSize="11"/>
                                         <CheckBox Content="Adicionar $OEM$ (scripts pós-instalação)" Margin="0,0,0,6" Foreground="White" FontSize="11"/>
                                         <CheckBox Content="Ei.cfg genérico (desbloqueia edições)" IsChecked="True" Margin="0,0,0,6" Foreground="White" FontSize="11"/>
@@ -371,11 +323,11 @@
 
                             <!-- Coluna Direita -->
                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
+                                <Border Background="{DynamicResource Surface1}" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
                                     <StackPanel>
-                                        <TextBlock Text="🔧 Registro Avançado" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
+                                        <TextBlock Text="🔧 Registro Avançado" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,0,8"/>
                                         <TextBlock Text="Cole .reg — será injetado offline via wimlib no registro do WIM" FontSize="11" Foreground="#888" Margin="0,0,0,8"/>
-                                        <TextBox x:Name="TxtStudioReg" Height="90" AcceptsReturn="True" TextWrapping="Wrap" Background="#0F0F0F" Foreground="#CCC" BorderBrush="#333" FontFamily="Consolas" FontSize="11" Padding="8" VerticalScrollBarVisibility="Auto" Text="Windows Registry Editor Version 5.00&#x0a;&#x0a;[HKEY_LOCAL_MACHINE\SOFTWARE\Exemplo]&#x0a;&quot;Valor&quot;=dword:00000001"/>
+                                        <TextBox x:Name="TxtStudioReg" Height="90" AcceptsReturn="True" TextWrapping="Wrap" Background="{DynamicResource Surface0}" Foreground="#CCC" BorderBrush="{DynamicResource BorderSubtle}" FontFamily="Consolas" FontSize="11" Padding="8" VerticalScrollBarVisibility="Auto" Text="Windows Registry Editor Version 5.00&#x0a;&#x0a;[HKEY_LOCAL_MACHINE\SOFTWARE\Exemplo]&#x0a;&quot;Valor&quot;=dword:00000001"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                             <Button Content="Importar .reg" Width="110" Height="28" Style="{StaticResource SecondaryButtonStyle}" FontSize="11"/>
                                             <Button Content="Limpar" Width="80" Height="28" Margin="8,0,0,0" Style="{StaticResource SecondaryButtonStyle}" FontSize="11"/>
@@ -383,9 +335,9 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
+                                <Border Background="{DynamicResource Surface1}" CornerRadius="10" Padding="14" Margin="0,0,0,12" BorderBrush="#2A2A2A" BorderThickness="1">
                                     <StackPanel>
-                                        <TextBlock Text="🌐 Idioma &amp; Região" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
+                                        <TextBlock Text="🌐 Idioma &amp; Região" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,0,8"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -393,7 +345,7 @@
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Margin="0,0,6,0">
                                                 <TextBlock Text="Idioma base" Foreground="#888" FontSize="11" Margin="0,0,0,4"/>
-                                                <ComboBox Height="30" SelectedIndex="0" Style="{StaticResource DarkComboBoxStyle}">
+                                                <ComboBox Height="30" SelectedIndex="0">
                                                     <ComboBoxItem Content="pt-BR"/>
                                                     <ComboBoxItem Content="en-US"/>
                                                     <ComboBoxItem Content="es-ES"/>
@@ -401,7 +353,7 @@
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Margin="6,0,0,0">
                                                 <TextBlock Text="TimeZone" Foreground="#888" FontSize="11" Margin="0,0,0,4"/>
-                                                <ComboBox Height="30" SelectedIndex="0" Style="{StaticResource DarkComboBoxStyle}">
+                                                <ComboBox Height="30" SelectedIndex="0">
                                                     <ComboBoxItem Content="E. South America"/>
                                                     <ComboBoxItem Content="Eastern US"/>
                                                 </ComboBox>
@@ -411,12 +363,12 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border Background="#1A1A1A" CornerRadius="10" Padding="14" BorderBrush="#2A2A2A" BorderThickness="1">
+                                <Border Background="{DynamicResource Surface1}" CornerRadius="10" Padding="14" BorderBrush="#2A2A2A" BorderThickness="1">
                                     <StackPanel>
-                                        <TextBlock Text="🏷️ OEM Branding" FontWeight="Bold" Foreground="#FFD700" FontSize="12" Margin="0,0,0,8"/>
-                                        <TextBox Text="Fabricante" Background="#111" Foreground="White" BorderBrush="#333" Padding="8" Height="30" Margin="0,0,0,6"/>
-                                        <TextBox Text="Modelo" Background="#111" Foreground="White" BorderBrush="#333" Padding="8" Height="30" Margin="0,0,0,6"/>
-                                        <TextBox Text="URL de suporte" Background="#111" Foreground="White" BorderBrush="#333" Padding="8" Height="30"/>
+                                        <TextBlock Text="🏷️ OEM Branding" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,0,8"/>
+                                        <TextBox Text="Fabricante" Background="#111" Foreground="White" BorderBrush="{DynamicResource BorderSubtle}" Padding="8" Height="30" Margin="0,0,0,6"/>
+                                        <TextBox Text="Modelo" Background="#111" Foreground="White" BorderBrush="{DynamicResource BorderSubtle}" Padding="8" Height="30" Margin="0,0,0,6"/>
+                                        <TextBox Text="URL de suporte" Background="#111" Foreground="White" BorderBrush="{DynamicResource BorderSubtle}" Padding="8" Height="30"/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -439,8 +391,8 @@
 
         <!-- Loading Overlay (padrao WinpeToolsPage/UpdatePage: progresso real + log em tempo real) -->
         <Border x:Name="OverlayBusy" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed" Margin="-30">
-            <Border Background="#1A1A1A" CornerRadius="12" Padding="30" Width="540"
-                    BorderBrush="#FFD700" BorderThickness="1"
+            <Border Background="{DynamicResource Surface1}" CornerRadius="12" Padding="30" Width="540"
+                    BorderBrush="{DynamicResource AccentColor}" BorderThickness="1"
                     VerticalAlignment="Center" HorizontalAlignment="Center">
                 <Border.Effect>
                     <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="10" Opacity="0.5"/>
@@ -452,12 +404,12 @@
                 </Grid.RowDefinitions>
                 <StackPanel>
                     <TextBlock x:Name="TxtOpTitle" Text="&#x1F4BF; KIT ISO EDITOR - EXECUTANDO" FontSize="18" FontWeight="Bold"
-                               Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                               Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,15"/>
 
                     <!-- Barra de Progresso Real -->
-                    <Border Background="#333333" CornerRadius="6" Height="22" Margin="0,0,0,5">
+                    <Border Background="{DynamicResource BorderSubtle}" CornerRadius="6" Height="22" Margin="0,0,0,5">
                         <Grid>
-                            <Border x:Name="ProgressFill" Background="#FFD700" CornerRadius="6"
+                            <Border x:Name="ProgressFill" Background="{DynamicResource AccentColor}" CornerRadius="6"
                                     HorizontalAlignment="Left" Width="0"/>
                             <TextBlock x:Name="TxtProgressPercent" Text="0%"
                                        FontSize="11" FontWeight="Bold" Foreground="#FFFFFF"
@@ -467,7 +419,7 @@
 
                     <!-- Steps / Status -->
                     <TextBlock x:Name="TxtProgressStep" Text="Inicializando..."
-                               FontSize="11" Foreground="#FFD700" Margin="0,2,0,0" FontWeight="SemiBold"/>
+                               FontSize="11" Foreground="{DynamicResource AccentColor}" Margin="0,2,0,0" FontWeight="SemiBold"/>
                     <TextBlock x:Name="TxtProgressStatus" Text="Aguarde..."
                                FontSize="13" Foreground="#E0E0E0" Margin="0,4,0,0" TextWrapping="Wrap"/>
 
@@ -479,10 +431,10 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                <TextBlock x:Name="TxtOpDesc" Text="" Foreground="#888888" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="TxtOpDesc" Text="" Foreground="{DynamicResource TextMuted}" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap"/>
                             </ScrollViewer>
                             <TextBlock Grid.Row="1" x:Name="TxtCopyOpLog" Text="&#x1F4CB; Copiar log"
-                                       Foreground="#555" FontSize="11" Cursor="Hand"
+                                       Foreground="{DynamicResource BorderStrong}" FontSize="11" Cursor="Hand"
                                        HorizontalAlignment="Right" Margin="0,4,0,0"
                                        MouseDown="TxtCopyOpLog_MouseDown"/>
                         </Grid>
@@ -499,37 +451,9 @@
                             HorizontalAlignment="Center" Margin="0,8,0,0" Foreground="#FF8888" BorderBrush="#552222"/>
                 </StackPanel>
 
-                <!-- Rodela estilo Windows 11 em linha propria abaixo do conteudo (nunca cobre o texto vermelho) -->
-                <Grid Grid.Row="1" Width="44" Height="44" RenderTransformOrigin="0.5,0.5"
-                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,10,14,0">
-                    <Grid.RenderTransform>
-                        <RotateTransform x:Name="SpinnerRotateIso"/>
-                    </Grid.RenderTransform>
-                    <Grid.Triggers>
-                        <EventTrigger RoutedEvent="Loaded">
-                            <BeginStoryboard>
-                                <Storyboard RepeatBehavior="Forever">
-                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1.4"/>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </Grid.Triggers>
-                    <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Ellipse.RenderTransform><TranslateTransform X="0" Y="-16"/></Ellipse.RenderTransform>
-                    </Ellipse>
-                    <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Ellipse.RenderTransform><TranslateTransform X="15.2" Y="-4.9"/></Ellipse.RenderTransform>
-                    </Ellipse>
-                    <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Ellipse.RenderTransform><TranslateTransform X="9.4" Y="12.9"/></Ellipse.RenderTransform>
-                    </Ellipse>
-                    <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Ellipse.RenderTransform><TranslateTransform X="-9.4" Y="12.9"/></Ellipse.RenderTransform>
-                    </Ellipse>
-                    <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Ellipse.RenderTransform><TranslateTransform X="-15.2" Y="-4.9"/></Ellipse.RenderTransform>
-                    </Ellipse>
-                </Grid>
+                <!-- Rodela oficial do Kit (Themes/Spinners.xaml) em linha propria abaixo do conteudo -->
+                <ContentControl Grid.Row="1" Template="{StaticResource Win11SpinnerTemplate}"
+                                HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,10,14,0"/>
             </Grid>
         </Border>
     </Border>

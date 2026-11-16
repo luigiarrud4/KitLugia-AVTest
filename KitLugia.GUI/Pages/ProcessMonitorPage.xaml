@@ -10,42 +10,6 @@
       Background="#1E1E1E">
 
     <Page.Resources>
-        <!-- Estilo do Processo Item - Seleção Visual -->
-        <Style x:Key="ProcessItemStyle" TargetType="ListViewItem">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Margin" Value="0,1"/>
-            <Setter Property="Padding" Value="10,8"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListViewItem">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" 
-                                CornerRadius="4" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#2A2A2A"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#1A3A2A"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#FFD700"/>
-                                <Setter TargetName="Bd" Property="BorderThickness" Value="1"/>
-                            </Trigger>
-                            <MultiTrigger>
-                                <MultiTrigger.Conditions>
-                                    <Condition Property="IsSelected" Value="True"/>
-                                    <Condition Property="IsMouseOver" Value="True"/>
-                                </MultiTrigger.Conditions>
-                                <Setter TargetName="Bd" Property="Background" Value="#1A4A3A"/>
-                            </MultiTrigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <!-- Estilo para botões de ação -->
         <Style x:Key="ActionBtn" TargetType="Button">
             <Setter Property="Background" Value="#2A2A2A"/>
@@ -117,7 +81,7 @@
             <StackPanel Orientation="Horizontal">
                 <Ellipse Width="10" Height="10" Fill="#4ECDC4" Margin="0,0,6,0"/>
                 <TextBlock Text="Apps do Usuário" Foreground="#AAA" FontSize="11" VerticalAlignment="Center" Margin="0,0,20,0"/>
-                <Ellipse Width="10" Height="10" Fill="#FFD700" Margin="0,0,6,0"/>
+                <Ellipse Width="10" Height="10" Fill="{DynamicResource AccentColor}" Margin="0,0,6,0"/>
                 <TextBlock Text="Background" Foreground="#AAA" FontSize="11" VerticalAlignment="Center" Margin="0,0,20,0"/>
                 <Ellipse Width="10" Height="10" Fill="#828282" Margin="0,0,6,0"/>
                 <TextBlock Text="Windows/Sistema" Foreground="#AAA" FontSize="11" VerticalAlignment="Center" Margin="0,0,20,0"/>
@@ -163,7 +127,7 @@
 
                                     <!-- Ícone do processo -->
                                     <Border Grid.Column="0" Width="32" Height="32" CornerRadius="4" 
-                                            Background="#333" VerticalAlignment="Center" Margin="0,0,8,0">
+                                            Background="{DynamicResource BorderSubtle}" VerticalAlignment="Center" Margin="0,0,8,0">
                                         <Image Source="{Binding Icon}" Width="24" Height="24" Stretch="Uniform"
                                                RenderOptions.BitmapScalingMode="HighQuality"/>
                                     </Border>
@@ -267,7 +231,7 @@
                                        Foreground="#666" FontSize="12" VerticalAlignment="Center" Margin="10,0,0,0"/>
                             
                             <TextBlock Grid.Column="4" Text="💡 Selecione um processo e clique Finalizar" 
-                                       Foreground="#555" FontSize="11" VerticalAlignment="Center"/>
+                                       Foreground="{DynamicResource BorderStrong}" FontSize="11" VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
                 </Grid>

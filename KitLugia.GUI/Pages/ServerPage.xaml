@@ -36,23 +36,6 @@
             </Setter>
         </Style>
 
-        <Style x:Key="SecButton" TargetType="Button">
-            <Setter Property="Background" Value="#2A2A2A"/><Setter Property="Foreground" Value="#FFD700"/>
-            <Setter Property="BorderBrush" Value="#FFD700"/><Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontSize" Value="11"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="10,5">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#3A3A3A"/><Setter Property="BorderBrush" Value="#FFA500"/></Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Page.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -60,7 +43,7 @@
 
             <!-- CABEÇALHO -->
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="🌐 Servidor Minecraft Público"/>
-            <TextBlock Text="Compartilhe seu mundo Minecraft SEM precisar configurar roteador ou usar Hamachi." Foreground="#A0A0A0" Margin="0,5,0,20" TextWrapping="Wrap"/>
+            <TextBlock Text="Compartilhe seu mundo Minecraft SEM precisar configurar roteador ou usar Hamachi." Foreground="{DynamicResource TextDescription}" Margin="0,5,0,20" TextWrapping="Wrap"/>
 
             <!-- STATUS -->
             <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
@@ -72,7 +55,7 @@
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock x:Name="StatusText" Text="Pronto" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                            <TextBlock x:Name="StatusDetail" Text="Abra o Minecraft e clique em Detectar" FontSize="11" Foreground="#A0A0A0"/>
+                            <TextBlock x:Name="StatusDetail" Text="Abra o Minecraft e clique em Detectar" FontSize="11" Foreground="{DynamicResource TextDescription}"/>
                         </StackPanel>
                         <Button x:Name="BtnToggle" Grid.Column="2" Width="170" Height="40" Style="{StaticResource GoldButtonStyle}" Content="▶ Iniciar" Click="BtnToggle_Click" FontSize="12"/>
                     </Grid>
@@ -82,14 +65,14 @@
             <!-- CONFIGURAÇÃO -->
             <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
                 <StackPanel Margin="15">
-                    <TextBlock Text="⚙️ Configuração do Servidor" FontSize="16" FontWeight="Bold" Foreground="#FFD700"/>
-                    <TextBlock Text="Detecte automaticamente a porta do Minecraft LAN e compartilhe com amigos." Foreground="#A0A0A0" FontSize="12" Margin="0,3,0,12"/>
+                    <TextBlock Text="⚙️ Configuração do Servidor" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
+                    <TextBlock Text="Detecte automaticamente a porta do Minecraft LAN e compartilhe com amigos." Foreground="{DynamicResource TextDescription}" FontSize="12" Margin="0,3,0,12"/>
                     
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="180"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="🎮" FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <TextBlock Grid.Column="1" Text="Porta do Minecraft LAN" FontSize="13" Foreground="White" VerticalAlignment="Center"/>
-                        <TextBox x:Name="TxtMinecraftPort" Grid.Column="2" Height="30" Text="" Style="{StaticResource DarkTextBoxStyle}" FontSize="12" Background="#1A1A1A" Foreground="White"/>
+                        <TextBox x:Name="TxtMinecraftPort" Grid.Column="2" Height="30" Text="" Style="{StaticResource DarkTextBoxStyle}" FontSize="12" Background="{DynamicResource Surface1}" Foreground="White"/>
                         <Button x:Name="BtnDetect" Grid.Column="3" Content="🔍 Detectar" Style="{StaticResource SecButton}" Width="100" Height="30" Margin="10,0,0,0" Click="BtnDetect_Click"/>
                     </Grid>
                     
@@ -101,7 +84,7 @@
             <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15">
                 <StackPanel Margin="15">
                     <TextBlock Text="🌍 Endereço para Amigos" FontSize="13" FontWeight="Bold" Foreground="White"/>
-                    <TextBlock x:Name="TxtEndpoint" Text="Aguardando detecção..." FontSize="18" FontWeight="Bold" Foreground="#00FF00" Background="#1A1A1A" Padding="10,6" FontFamily="Consolas" Margin="0,6,0,6"/>
+                    <TextBlock x:Name="TxtEndpoint" Text="Aguardando detecção..." FontSize="18" FontWeight="Bold" Foreground="#00FF00" Background="{DynamicResource Surface1}" Padding="10,6" FontFamily="Consolas" Margin="0,6,0,6"/>
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="📋 Copie e envie para seus amigos conectarem" Foreground="#808080" FontSize="11" VerticalAlignment="Center"/>
@@ -119,7 +102,7 @@
                 <StackPanel Margin="12">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="📋 Log" FontSize="13" FontWeight="Bold" Foreground="#FFD700"/>
+                        <TextBlock Grid.Column="0" Text="📋 Log" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
                             <TextBlock x:Name="TxtLogCount" Text="0" FontSize="11" Foreground="#808080" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <Button Content="📋 Copiar" Style="{StaticResource SecButton}" Width="70" Height="25" FontSize="11" Click="BtnCopyLog_Click" Margin="0,0,4,0"/>
@@ -137,7 +120,7 @@
             <!-- GUIA -->
             <Border Background="#15FFFFFF" BorderBrush="#33FFD700" BorderThickness="1" CornerRadius="8">
                 <StackPanel Margin="15">
-                    <TextBlock Text="📖 Guia Rápido" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,10"/>
+                    <TextBlock Text="📖 Guia Rápido" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,10"/>
                     <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#C0C0C0" LineHeight="18">
                         <Run Text="🎮 PASSO 1: "/><Run Text="Abra o Minecraft e entre no seu mundo" FontWeight="Bold" Foreground="White"/><LineBreak/>
                         <Run Text="🎮 PASSO 2: "/><Run Text="Pressione ESC → 'Abrir para LAN'" FontWeight="Bold" Foreground="White"/><LineBreak/>

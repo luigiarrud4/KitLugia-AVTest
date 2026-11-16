@@ -13,7 +13,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Border x:Name="CheckBoxBorder" Grid.Column="0" Width="22" Height="22" CornerRadius="3" Background="#1A1A1A" BorderBrush="#FFFFFF" BorderThickness="1.5" RenderTransformOrigin="0.5,0.5">
+                        <Border x:Name="CheckBoxBorder" Grid.Column="0" Width="22" Height="22" CornerRadius="3" Background="{DynamicResource Surface1}" BorderBrush="#FFFFFF" BorderThickness="1.5" RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
                                 <ScaleTransform ScaleX="1" ScaleY="1" CenterX="0.5" CenterY="0.5"/>
                             </Border.RenderTransform>
@@ -65,7 +65,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type CheckBox}">
                     <Grid Background="Transparent">
-                        <Border x:Name="CheckBoxBorder" Width="22" Height="22" CornerRadius="3" Background="#1A1A1A" BorderBrush="#FFFFFF" BorderThickness="1.5" RenderTransformOrigin="0.5,0.5">
+                        <Border x:Name="CheckBoxBorder" Width="22" Height="22" CornerRadius="3" Background="{DynamicResource Surface1}" BorderBrush="#FFFFFF" BorderThickness="1.5" RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
                                 <ScaleTransform ScaleX="1" ScaleY="1" CenterX="0.5" CenterY="0.5"/>
                             </Border.RenderTransform>
@@ -208,5 +208,44 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- Switch compacto sem conteudo (so' o controle): usado em linhas de configuracao. -->
+    <Style x:Key="TrayToggle" TargetType="{x:Type CheckBox}">
+        <Setter Property="Width" Value="44"/>
+        <Setter Property="Height" Value="24"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type CheckBox}">
+                    <Border x:Name="toggleBorder"
+                            Background="#3E3E3E"
+                            CornerRadius="12"
+                            BorderThickness="1"
+                            BorderBrush="#505050">
+                        <Ellipse x:Name="toggleCircle"
+                                 Width="14" Height="14"
+                                 Fill="#BBBBBB"
+                                 HorizontalAlignment="Left"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0">
+                            <Ellipse.Effect>
+                                <DropShadowEffect ShadowDepth="1" BlurRadius="2" Opacity="0.3"/>
+                            </Ellipse.Effect>
+                        </Ellipse>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="toggleBorder" Property="Background" Value="{DynamicResource AccentColor}"/>
+                            <Setter TargetName="toggleBorder" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                            <Setter TargetName="toggleCircle" Property="Fill" Value="#101010"/>
+                            <Setter TargetName="toggleCircle" Property="HorizontalAlignment" Value="Right"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Mesmo switch compacto do TrayToggle, mantido com a chave original da pagina. -->
+    <Style x:Key="AdvancedToggle" TargetType="{x:Type CheckBox}" BasedOn="{StaticResource TrayToggle}"/>
 
 </ResourceDictionary>

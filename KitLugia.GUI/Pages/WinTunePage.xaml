@@ -7,44 +7,9 @@
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
     <Page.Resources>
-        <!-- Estilo do ToolTip (Bal&#xE3;o de Informa&#xE7;&#xE3;o) -->
-        <Style TargetType="ToolTip">
-            <Setter Property="Background" Value="#1A1A1A"/>
-            <Setter Property="Foreground" Value="#FFF"/>
-            <Setter Property="BorderBrush" Value="#FFD700"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="10"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="MaxWidth" Value="400"/>
-        </Style>
+        <!-- ToolTip agora vem do tema (Themes/BaseStyles.xaml) -->
 
-        <!-- Estilo do Bot&#xE3;o de Informa&#xE7;&#xE3;o (c&#xED;rculo com i) -->
-        <Style x:Key="InfoButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="24"/>
-            <Setter Property="Height" Value="24"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Cursor" Value="Help"/>
-            <Setter Property="Margin" Value="5,0,0,0"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bdr" Background="Transparent" CornerRadius="12" Width="24" Height="24"
-                                BorderBrush="#FFD700" BorderThickness="1.5">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bdr" Property="Background" Value="#20FFD700"/>
-                                <Setter TargetName="bdr" Property="BorderThickness" Value="2"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <!-- InfoButtonStyle agora vem do tema (Themes/Buttons.xaml) -->
 
         <!-- Estilo do TabItem (Bot&#xF5;es do topo) -->
         <Style TargetType="TabItem">
@@ -90,7 +55,7 @@
         <StackPanel Margin="40,30,40,50" MaxWidth="900" HorizontalAlignment="Left">
 
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="WinTune Optimizations" Margin="0,0,0,10"/>
-            <TextBlock Text="Ative ou desative cada otimiza&#xE7;&#xE3;o individualmente. Altera&#xE7;&#xF5;es exigem reinicializa&#xE7;&#xE3;o." Foreground="#A0A0A0" Margin="0,0,0,25"/>
+            <TextBlock Text="Ative ou desative cada otimiza&#xE7;&#xE3;o individualmente. Altera&#xE7;&#xF5;es exigem reinicializa&#xE7;&#xE3;o." Foreground="{DynamicResource TextDescription}" Margin="0,0,0,25"/>
 
             <TabControl x:Name="WinTuneTabControl" Background="Transparent" BorderThickness="0">
                 <!-- ABA: SYSTEM -->
@@ -121,7 +86,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -153,7 +118,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -184,7 +149,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -215,7 +180,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -246,7 +211,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -277,7 +242,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -308,7 +273,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -339,7 +304,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -370,7 +335,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -401,7 +366,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -432,7 +397,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -463,7 +428,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -494,7 +459,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -525,7 +490,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -556,7 +521,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -587,7 +552,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -618,7 +583,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -649,7 +614,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -680,7 +645,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -711,7 +676,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -742,7 +707,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -773,7 +738,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -804,7 +769,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -835,7 +800,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -866,7 +831,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -897,7 +862,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -928,7 +893,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -959,7 +924,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -990,7 +955,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1021,7 +986,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1052,7 +1017,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1089,7 +1054,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1120,7 +1085,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1151,7 +1116,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1182,7 +1147,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1213,7 +1178,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1244,7 +1209,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1275,7 +1240,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1306,7 +1271,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1337,7 +1302,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1368,7 +1333,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1399,7 +1364,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1430,7 +1395,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1461,7 +1426,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1492,7 +1457,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1523,7 +1488,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1554,7 +1519,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1585,7 +1550,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1616,7 +1581,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1647,7 +1612,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1684,7 +1649,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1715,7 +1680,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1746,7 +1711,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1777,7 +1742,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1808,7 +1773,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1839,7 +1804,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1870,7 +1835,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1901,7 +1866,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1932,7 +1897,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1963,7 +1928,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -1994,7 +1959,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2031,7 +1996,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2062,7 +2027,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2093,7 +2058,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2124,7 +2089,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2155,7 +2120,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2186,7 +2151,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2223,7 +2188,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2254,7 +2219,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2285,7 +2250,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2316,7 +2281,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2347,7 +2312,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2378,7 +2343,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2409,7 +2374,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2440,7 +2405,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2471,7 +2436,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2502,7 +2467,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2533,7 +2498,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2564,7 +2529,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2595,7 +2560,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2626,7 +2591,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 
@@ -2658,7 +2623,7 @@
                                         </StackPanel>
                                     </ToolTip>
                                 </Button.ToolTip>
-                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="#FFD700" Opacity="0.8"
+                                <TextBlock Text="i" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Opacity="0.8"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
 

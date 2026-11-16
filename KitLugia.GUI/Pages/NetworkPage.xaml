@@ -58,64 +58,15 @@
                3) faltava propagar Horizontal/VerticalContentAlignment (a base do Kit
                   propaga) — sem isso o ScrollViewer estica e a linha de base do texto
                   sai de linha com o placeholder.
-             O placeholder continua por cima do host, agora com o MESMO padding unico. -->
-        <Style x:Key="DnsPlaceholderTextBoxStyle" TargetType="TextBox">
-            <Setter Property="Background" Value="#161616"/>
-            <Setter Property="BorderBrush" Value="#333"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="CaretBrush" Value="#FFD700"/>
-            <Setter Property="Padding" Value="8,6"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
-                            <Grid>
-                                <ScrollViewer x:Name="PART_ContentHost" Focusable="false"
-                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
-                                <!-- Placeholder alinhado com o texto/caret REAIS.
-                                     Margin.Left = 10 = Padding.Left (8) + 2px de recuo que o WPF
-                                     aplica DENTRO do host de edicao (medido: caret X=11 e
-                                     bd(border 1px) + 10 = 11). Com so o Padding (8) o
-                                     placeholder nasce em X=9, 2px a esquerda do texto — era o
-                                     resto do desalinhamento. ATENCAO: se mudar o Padding
-                                     desta style, ajustar 8-> novo valor aqui tambem.
-                                     So Margin (sem Padding no TextBlock) para o
-                                     TransformBounds medir a borda esquerda do glifo. -->
-                                <TextBlock x:Name="ph" Text="{TemplateBinding Tag}"
-                                           Margin="10,6,0,0"
-                                           FontSize="{TemplateBinding FontSize}" Foreground="#666"
-                                           VerticalAlignment="Center" IsHitTestVisible="False"
-                                           TextTrimming="CharacterEllipsis"
-                                           Visibility="Collapsed"/>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="Text" Value="">
-                                <Setter TargetName="ph" Property="Visibility" Value="Visible"/>
-                            </Trigger>
-                            <!-- ORDEM IMPORTA: o ÚLTIMO trigger que casa vence. Hover antes do foco
-                                 para o anel dourado do campo focado NÃO ser trocado pelo cinza
-                                 quando o rato está em cima (era o caso no print 06/10: campo com
-                                 caret dourado e borda cinza). -->
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#555"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#FFD700"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+             O placeholder continua por cima do host, agora com o MESMO padding unico.
+
+             Esta style virou DarkPlaceholderTextBoxStyle no tema
+             (Themes/BaseStyles.xaml) — as copias locais de NetworkPage e
+             MacSpoofPage eram identicas. -->
 
         <!-- TEMPLATE CUSTOMIZADO COM CHECKMARK -->
         <ControlTemplate x:Key="DnsButtonTemplate" TargetType="Button">
-            <Border x:Name="bdr" Background="#222" CornerRadius="8" BorderThickness="1" BorderBrush="#333" Padding="10">
+            <Border x:Name="bdr" Background="#222" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource BorderSubtle}" Padding="10">
                 <Grid>
                     <ContentPresenter VerticalAlignment="Center"
                                       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial"/>
@@ -140,55 +91,13 @@
             </ControlTemplate.Triggers>
         </ControlTemplate>
 
-        <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="30" />
-                </Grid.ColumnDefinitions>
-                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
-                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L4,4 L8,0" IsHitTestVisible="False"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Border" Property="Background" Value="#333333" />
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
-
-        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#1A1A1A"/>
-            <Setter Property="BorderBrush" Value="#444444"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Setter Property="OverridesDefaultStyle" Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ComboBox}">
-                        <Grid>
-                            <ToggleButton Name="ToggleButton" Template="{DynamicResource ComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
-                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
-                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="#1A1A1A" BorderThickness="1" BorderBrush="#444444"/>
-                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                    </ScrollViewer>
-                                </Grid>
-                            </Popup>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Page.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="30,30,30,50" MaxWidth="900">
 
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="Rede e Lat&#xEA;ncia" Margin="0,0,0,10"/>
-            <TextBlock Text="Otimiza&#xE7;&#xF5;es de conex&#xE3;o para jogos e navega&#xE7;&#xE3;o mais r&#xE1;pida." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+            <TextBlock Text="Otimiza&#xE7;&#xF5;es de conex&#xE3;o para jogos e navega&#xE7;&#xE3;o mais r&#xE1;pida." Foreground="{DynamicResource TextDescription}" Margin="0,0,0,30"/>
 
             <!-- SEÇÃO 1: DNS RÁPIDO -->
             <TextBlock Text="Gerenciador de DNS" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
@@ -220,7 +129,7 @@
 
                 <Button x:Name="BtnDhcp" Grid.Column="4" Height="100" Click="BtnDnsReset_Click" Template="{StaticResource DnsButtonTemplate}">
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="AUTO" FontWeight="Bold" FontSize="18" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="AUTO" FontWeight="Bold" FontSize="18" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center"/>
                         <TextBlock Text="Padr&#xE3;o (DHCP)" FontWeight="Bold" FontSize="12" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,0"/>
                         <TextBlock Text="Definido pelo roteador" FontSize="11" Foreground="#808080" HorizontalAlignment="Center"/>
                     </StackPanel>
@@ -233,7 +142,7 @@
             </StackPanel>
 
             <!-- DNS Rápido - Teste e Selecione -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Margin="0,0,0,15">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="10" Margin="0,0,0,15">
                 <StackPanel Margin="18,15,18,15">
 
                     <!-- Cabeçalho do card -->
@@ -247,7 +156,7 @@
                             <TextBlock Text="Teste todos os provedores e aplique o mais rápido com 1 clique" FontSize="11" Foreground="#888" Margin="0,2,0,0"/>
                         </StackPanel>
                         <Button x:Name="BtnBenchmarkDns" Grid.Column="1" Padding="14,7" Height="32"
-                                Background="#1A1A1A" Foreground="#FFD700" BorderBrush="#FFD700" BorderThickness="1"
+                                Background="{DynamicResource Surface1}" Foreground="{DynamicResource AccentColor}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1"
                                 FontSize="12" FontWeight="SemiBold" Cursor="Hand" Click="BtnBenchmarkDns_Click">
                             <Button.Resources>
                                 <Style TargetType="Border">
@@ -341,7 +250,7 @@
                                                         </TextBlock.Style>
                                                     </TextBlock>
                                                     <Button Grid.Column="5" Content="Aplicar" FontSize="11" FontWeight="SemiBold" Padding="8,3" Margin="4,0,0,0"
-                                                            Foreground="#FFD700" Background="#1A1A1A" BorderBrush="#FFD700" BorderThickness="1"
+                                                            Foreground="{DynamicResource AccentColor}" Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1"
                                                             Cursor="Hand" Tag="{Binding}" Click="BtnApplyDnsProvider_Click">
                                                         <Button.Resources>
                                                             <Style TargetType="Border">
@@ -368,7 +277,7 @@
                     </StackPanel>
 
                     <!-- DNS Customizado -->
-                    <Separator Background="{StaticResource CardBorder}" Margin="0,12,0,10"/>
+                    <Separator Background="{DynamicResource CardBorder}" Margin="0,12,0,10"/>
                     <TextBlock Text="DNS CUSTOMIZADO" FontSize="11" FontWeight="Bold" Foreground="#777" Margin="0,0,0,6"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -377,15 +286,15 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="TxtCustomDnsPrimary" FontSize="11" Padding="8,6" Height="32"
-                                 Background="#161616" Foreground="White" BorderBrush="#333" BorderThickness="1" CaretBrush="#FFD700"
+                                 Background="#161616" Foreground="White" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CaretBrush="{DynamicResource AccentColor}"
                                  Margin="0,0,6,0" VerticalContentAlignment="Center" VerticalAlignment="Center"
-                                 Style="{StaticResource DnsPlaceholderTextBoxStyle}" Tag="DNS Primário (ex: 8.8.8.8 Google)"/>
+                                 Style="{StaticResource DarkPlaceholderTextBoxStyle}" Tag="DNS Primário (ex: 8.8.8.8 Google)"/>
                         <TextBox x:Name="TxtCustomDnsSecondary" FontSize="11" Padding="8,6" Height="32"
-                                 Background="#161616" Foreground="White" BorderBrush="#333" BorderThickness="1" CaretBrush="#FFD700"
+                                 Background="#161616" Foreground="White" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CaretBrush="{DynamicResource AccentColor}"
                                  Margin="0,0,6,0" VerticalContentAlignment="Center" VerticalAlignment="Center" Grid.Column="1"
-                                 Style="{StaticResource DnsPlaceholderTextBoxStyle}" Tag="DNS Secundário (opcional, ex: 8.8.4.4)"/>
+                                 Style="{StaticResource DarkPlaceholderTextBoxStyle}" Tag="DNS Secundário (opcional, ex: 8.8.4.4)"/>
                         <Button Grid.Column="2" x:Name="BtnApplyCustomDns" Content="Aplicar" Padding="14,0" Height="32"
-                                Foreground="#FFD700" Background="#1A1A1A" BorderBrush="#FFD700" BorderThickness="1"
+                                Foreground="{DynamicResource AccentColor}" Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1"
                                 FontSize="12" FontWeight="SemiBold" Cursor="Hand" Click="BtnApplyCustomDns_Click">
                             <Button.Resources>
                                 <Style TargetType="Border">
@@ -398,11 +307,11 @@
             </Border>
 
             <!-- SEÇÃO 1.5: CONTROLE DO ADAPTADOR (LIGAR/DESLIGAR/RESTART) -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,5,0,25">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,5,0,25">
                 <StackPanel>
-                    <TextBlock Text="&#x1F4E1; Controle do Adaptador" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="20,15,20,5"/>
+                    <TextBlock Text="&#x1F4E1; Controle do Adaptador" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="20,15,20,5"/>
                     <TextBlock Text="Ligue, desligue ou reinicie o adaptador de rede para resolver problemas de conex&#xE3;o." FontSize="12" Foreground="#808080" Margin="20,0,20,10"/>
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
                     <TextBlock x:Name="TxtSelectedAdapterForControl" Text="Selecione um adaptador de rede" FontSize="13" Foreground="#808080" Margin="20,10,20,0"/>
                     <Grid Margin="20,10,20,20">
                         <Grid.ColumnDefinitions>
@@ -474,7 +383,7 @@
                                 </ControlTemplate>
                             </Button.Template>
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <TextBlock Text="&#x1F504; Reiniciar" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="&#x1F504; Reiniciar" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="Desliga e liga (2s)" FontSize="11" Foreground="#808080" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -484,7 +393,7 @@
 
             <!-- SEÇÃO 2: TCP/IP GLOBAL -->
             <TextBlock Text="TCP/IP Global" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,10,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8">
                 <StackPanel>
 
                     <!-- CTCP -->
@@ -499,7 +408,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="CTCP (Compound TCP) &#xE9; um algoritmo de controle de congestionamento do Windows otimizado para redes de alta lat&#xEA;ncia.&#x0a;&#x0a;&#x2705; Benef&#xED;cios:&#x0a;&#x2022; Melhor throughput em redes com alta lat&#xEA;ncia&#x0a;&#x2022; Otimizado para jogos online e VoIP&#x0a;&#x2022; Reduz perda de pacotes&#x0a;&#x2022; Melhor estabilidade de conex&#xE3;o&#x0a;&#x0a;&#x274C; Poss&#xED;veis desvantagens:&#x0a;&#x2022; Pode aumentar uso de CPU levemente&#x0a;&#x2022; Em redes muito r&#xE1;pidas, ganho pode ser menor&#x0a;&#x0a;&#x1F3AF; Recomendado para: Jogos online, streaming, videoconfer&#xEA;ncia, redes com alta lat&#xEA;ncia&#x0a;&#x0a;&#x26A0;&#xFE0F; N&#xE3;o recomendado para: Redes extremamente r&#xE1;pidas (lat&#xEA;ncia j&#xE1; muito baixa)"/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -510,7 +419,7 @@
                         <CheckBox x:Name="ChkCTCP" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkCTCP_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- RSS -->
                     <Grid Margin="20">
@@ -524,7 +433,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="RSS (Receive Side Scaling) distribui o processamento de pacotes de rede entre m&#xFA;ltiplos n&#xFA;cleos da CPU.&#x0a;&#x0a;&#x2705; Benef&#xED;cios:&#x0a;&#x2022; Melhor utiliza&#xE7;&#xE3;o de CPUs multi-core&#x0a;&#x2022; Aumenta throughput de rede&#x0a;&#x2022; Reduz carga em um &#xFA;nico core&#x0a;&#x2022; Melhor performance em redes de alta velocidade&#x0a;&#x0a;&#x274C; Poss&#xED;veis desvantagens:&#x0a;&#x2022; Requer CPU com 4+ n&#xFA;cleos para benef&#xED;cio real&#x0a;&#x2022; Pode aumentar consumo de energia&#x0a;&#x2022; Em CPUs de 2 n&#xFA;cleos, benef&#xED;cio &#xE9; m&#xED;nimo&#x0a;&#x0a;&#x1F3AF; Recomendado para: CPUs com 4+ cores, alta largura de banda, servidores, gaming&#x0a;&#x0a;&#x26A0;&#xFE0F; N&#xE3;o recomendado para: CPUs de 2 n&#xFA;cleos ou menos, laptops com bateria fraca"/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -535,7 +444,7 @@
                         <CheckBox x:Name="ChkRSS" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkRSS_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- TaskOffload -->
                     <Grid Margin="20">
@@ -549,7 +458,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Task Offload permite que a placa de rede (NIC) processe tarefas como checksum e segmenta&#xE7;&#xE3;o em vez da CPU.&#x0a;&#x0a;&#x2705; Benef&#xED;cios:&#x0a;&#x2022; Reduz carga da CPU significativamente&#x0a;&#x2022; Melhor performance geral do sistema&#x0a;&#x2022; Menor consumo de energia em alguns casos&#x0a;&#x2022; Acelera processamento de pacotes&#x0a;&#x0a;&#x274C; Poss&#xED;veis desvantagens:&#x0a;&#x2022; Requer placa de rede moderna com suporte&#x0a;&#x2022; Pode causar problemas em placas antigas&#x0a;&#x2022; Alguns drivers podem ter bugs&#x0a;&#x0a;&#x1F3AF; Recomendado para: Placas de rede modernas (Intel, Realtek), CPUs mais antigas, laptops&#x0a;&#x0a;&#x26A0;&#xFE0F; N&#xE3;o recomendado para: Placas de rede muito antigas, drivers inst&#xE1;veis, servidores espec&#xED;ficos"/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -560,7 +469,7 @@
                         <CheckBox x:Name="ChkTaskOffload" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkTaskOffload_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Network Throttling -->
                     <Grid Margin="20">
@@ -574,7 +483,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Network Throttling limita a largura de banda de aplica&#xE7;&#xF5;es n&#xE3;o-multim&#xED;dia para priorizar streaming de m&#xED;dia.&#x0a;&#x0a;&#x2705; Benef&#xED;cios ao desativar:&#x0a;&#x2022; Remove limita&#xE7;&#xE3;o de largura de banda&#x0a;&#x2022; Melhor performance em jogos e downloads&#x0a;&#x2022; Maior throughput geral&#x0a;&#x2022; Melhor para aplica&#xE7;&#xF5;es de alta performance&#x0a;&#x0a;&#x274C; Poss&#xED;veis desvantagens ao desativar:&#x0a;&#x2022; Pode afetar streaming de m&#xED;dia leve&#x0a;&#x2022; Windows pode priorizar menos streaming&#x0a;&#x0a;&#x1F3AF; Recomendado para: Jogos, downloads, aplica&#xE7;&#xF5;es de alta performance, usu&#xE1;rios que n&#xE3;o fazem streaming&#x0a;&#x0a;&#x26A0;&#xFE0F; N&#xE3;o recomendado para: Usu&#xE1;rios que fazem muito streaming de m&#xED;dia, sistemas dedicados a multim&#xED;dia"/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -590,15 +499,15 @@
 
             <!-- SEÇÃO 3: ADAPTADOR DE REDE (NIC) + MAC SPOOFING -->
             <TextBlock Text="Adaptador de Rede (NIC)" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8">
                 <StackPanel>
 
                     <!-- Info do Adaptador -->
-                    <Border Background="#252525" CornerRadius="4" Padding="15" Margin="20,20,20,10">
+                    <Border Background="{DynamicResource Surface2}" CornerRadius="4" Padding="15" Margin="20,20,20,10">
                         <StackPanel>
-                            <TextBlock Text="&#x1F4E1; Adaptador de Rede" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
-                            <TextBlock x:Name="TxtAdapterInfo" Text="Detectando..." FontSize="12" Foreground="#A0A0A0" Margin="0,5,0,0"/>
-                            <ComboBox x:Name="CmbNetworkAdapter" Margin="0,10,0,0" Height="30" FontSize="12" SelectionChanged="CmbNetworkAdapter_SelectionChanged" Style="{StaticResource DarkComboBoxStyle}"/>
+                            <TextBlock Text="&#x1F4E1; Adaptador de Rede" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
+                            <TextBlock x:Name="TxtAdapterInfo" Text="Detectando..." FontSize="12" Foreground="{DynamicResource TextDescription}" Margin="0,5,0,0"/>
+                            <ComboBox x:Name="CmbNetworkAdapter" Margin="0,10,0,0" Height="30" FontSize="12" SelectionChanged="CmbNetworkAdapter_SelectionChanged"/>
                             <!-- Status em tempo real -->
                             <Grid Margin="0,10,0,0">
                                 <Grid.ColumnDefinitions>
@@ -609,14 +518,14 @@
                                 </Grid.ColumnDefinitions>
                                 <Border x:Name="AdapterStatusIndicator" Grid.Column="0" Width="10" Height="10" CornerRadius="5" Background="#808080" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <TextBlock x:Name="TxtAdapterStatus" Grid.Column="1" Text="Verificando..." FontSize="11" Foreground="#808080" VerticalAlignment="Center" Margin="0,0,15,0"/>
-                                <TextBlock x:Name="TxtRefreshStatus" Grid.Column="2" Text="" FontSize="11" Foreground="#555" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtRefreshStatus" Grid.Column="2" Text="" FontSize="11" Foreground="{DynamicResource BorderStrong}" VerticalAlignment="Center"/>
                                 <TextBlock x:Name="TxtAdapterMac" Grid.Column="3" Text="MAC: ---" FontSize="11" Foreground="#AAAAAA" FontFamily="Consolas"/>
                             </Grid>
                         </StackPanel>
                     </Border>
 
                     <!-- MAC SPOOFING -->
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
                     <Border Background="#1E1E2A" CornerRadius="4" Padding="15" Margin="20,10,20,15">
                         <StackPanel>
                             <TextBlock Text="&#x1F4E1; MAC Address Spoofing" FontSize="13" FontWeight="Bold" Foreground="#F48120" Margin="0,0,0,5"/>
@@ -666,7 +575,7 @@
                                         </ControlTemplate>
                                     </Button.Template>
                                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Orientation="Horizontal">
-                                        <TextBlock Text="&#x1F3B2;  Gerar Novo MAC" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
+                                        <TextBlock Text="&#x1F3B2;  Gerar Novo MAC" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
                                     </StackPanel>
                                 </Button>
                                 <Button x:Name="BtnApplyMac" Grid.Column="2" Height="40" Cursor="Hand" IsEnabled="False" Click="BtnApplyMac_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.02" controls:HoverZoom.DurationMs="150">
@@ -766,8 +675,8 @@
                     </Border>
 
                     <!-- LIMPEZA DE REDE -->
-                    <Separator Background="{StaticResource CardBorder}"/>
-                    <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,15,0,0">
+                    <Separator Background="{DynamicResource CardBorder}"/>
+                    <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,15,0,0">
                         <StackPanel Margin="20">
                             <TextBlock Text="&#x1F9F9;  Limpeza de Rede" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
                             <TextBlock Text="Limpa cache DNS, Winsock, TCP/IP, ARP, proxy, SSL e credenciais." FontSize="12" Foreground="#808080" Margin="0,0,0,15"/>
@@ -780,7 +689,7 @@
                                 <Button x:Name="BtnCleanNetworkSafe" Grid.Column="0" Height="45" Cursor="Hand" Click="BtnCleanNetworkSafe_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.02" controls:HoverZoom.DurationMs="150">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
-                                            <Border x:Name="cardBorder" Background="#1A2A1A" BorderBrush="#4CAF50" BorderThickness="1" CornerRadius="8" RenderTransformOrigin="0.5,0.5">
+                                            <Border x:Name="cardBorder" Background="#1A2A1A" BorderBrush="{DynamicResource SuccessBrush}" BorderThickness="1" CornerRadius="8" RenderTransformOrigin="0.5,0.5">
                                                 <ContentPresenter x:Name="content" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
@@ -826,7 +735,7 @@
                     </Border>
 
                     <!-- Interrupt Moderation -->
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
                     <Grid Margin="20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -838,7 +747,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Interrupt Moderation agrupa interrup&#xE7;&#xF5;es de rede para reduzir carga da CPU, mas aumenta lat&#xEA;ncia.&#x0a;&#x0a;&#x2705; Benef&#xED;cios ao desativar:&#x0a;&#x2022; Reduz lat&#xEA;ncia (ping mais baixo)&#x0a;&#x2022; Melhor responsividade em jogos&#x0a;&#x2022; Melhor para jogos competitivos&#x0a;&#x2022; Resposta mais r&#xE1;pida em tempo real&#x0a;&#x0a;&#x274C; Poss&#xED;veis desvantagens ao desativar:&#x0a;&#x2022; Aumenta uso da CPU ligeiramente&#x0a;&#x2022; Mais interrup&#xE7;&#xF5;es por segundo&#x0a;&#x2022; Pode afetar bateria em laptops&#x0a;&#x0a;&#x1F3AF; Recomendado para: Jogos competitivos (FPS, MOBA), baixa lat&#xEA;ncia, desktops&#x0a;&#x0a;&#x26A0;&#xFE0F; N&#xE3;o recomendado para: Laptops com bateria fraca, CPUs muito antigas, servidores&#x0a;&#x26A0;&#xFE0F; Aplicado ao adaptador de rede selecionado"/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -849,7 +758,7 @@
                         <CheckBox x:Name="ChkInterruptModeration" Grid.Column="3" Style="{StaticResource ToggleSwitchStyle}" Click="ChkInterruptModeration_Click"/>
                     </Grid>
 
-                    <Separator Background="{StaticResource CardBorder}"/>
+                    <Separator Background="{DynamicResource CardBorder}"/>
 
                     <!-- Nagle's Algorithm -->
                     <Grid Margin="20">
@@ -863,7 +772,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="Nagle's Algorithm agrupa pequenos pacotes para reduzir overhead de rede, mas aumenta lat&#xEA;ncia.&#x0a;&#x0a;&#x2705; Benef&#xED;cios ao desativar:&#x0a;&#x2022; Pacotes s&#xE3;o enviados imediatamente&#x0a;&#x2022; Reduz lat&#xEA;ncia significativamente (50-100ms)&#x0a;&#x2022; Melhor para jogos em tempo real&#x0a;&#x2022; Resposta mais r&#xE1;pida em aplica&#xE7;&#xF5;es interativas&#x0a;&#x0a;&#x274C; Poss&#xED;veis desvantagens ao desativar:&#x0a;&#x2022; Aumenta overhead de rede (mais pacotes)&#x0a;&#x2022; Pode aumentar uso de banda levemente&#x0a;&#x2022; Menos eficiente para transfer&#xEA;ncias grandes&#x0a;&#x0a;&#x1F3AF; Recomendado para: Jogos FPS, MOBA, aplica&#xE7;&#xF5;es de baixa lat&#xEA;ncia, VoIP, streaming&#x0a;&#x0a;&#x26A0;&#xFE0F; N&#xE3;o recomendado para: Transfer&#xEA;ncias de arquivos grandes, servidores de arquivos&#x0a;&#x26A0;&#xFE0F; Aplicado a todas as interfaces de rede"/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">
@@ -879,7 +788,7 @@
 
             <!-- SEÇÃO 4: REGISTRY TWEAKS -->
             <TextBlock Text="Registry Tweaks Avan&#xE7;ados" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,30,0,15"/>
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8">
                 <StackPanel>
 
                     <!-- TCP Registry Tweaks -->
@@ -894,7 +803,7 @@
                             <Button.ToolTip>
                                 <ToolTip Content="TCP Registry Tweaks ajusta par&#xE2;metros avan&#xE7;ados do TCP no registro do Windows.&#x0a;&#x0a;&#x2705; Benef&#xED;cios:&#x0a;&#x2022; Window Scaling (janelas TCP maiores - at&#xE9; 1GB)&#x0a;&#x2022; MaxUserPort (65534 portas dispon&#xED;veis)&#x0a;&#x2022; TcpTimedWaitDelay (libera portas em 30s)&#x0a;&#x2022; DefaultTTL (64 hops otimizado)&#x0a;&#x2022; ARP Cache (cache maior - menos queries)&#x0a;&#x2022; TCP Ack Frequency (respostas mais r&#xE1;pidas)&#x0a;&#x2022; TCP No Delay (desabilita atrasos de Nagle)&#x0a;&#x0a;&#x274C; Poss&#xED;veis desvantagens:&#x0a;&#x2022; Modifica&#xE7;&#xF5;es no registro do sistema&#x0a;&#x2022; Requer reinicializa&#xE7;&#xE3;o para alguns tweaks&#x0a;&#x2022; Pode n&#xE3;o funcionar em todas as redes&#x0a;&#x0a;&#x1F3AF; Recomendado para: Gaming, alta performance de rede, servidores, redes modernas&#x0a;&#x0a;&#x26A0;&#xFE0F; N&#xE3;o recomendado para: Redes corporativas com pol&#xED;ticas restritivas, sistemas cr&#xED;ticos sem backup"/>
                             </Button.ToolTip>
-                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                            <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                             
                         </Button>
                         <StackPanel Grid.Column="1">

@@ -1,0 +1,19 @@
+﻿<Window x:Class="KitLugia.Bootstrap.DependencyDialogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:KitLugia.Bootstrap"
+        Title="Instalação do KitLugia"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterScreen"
+        Width="596"
+        ShowInTaskbar="True">
+    <!-- 28 px de folga em volta do conteudo: o brilho dourado da borda (DropShadowEffect)
+         e' desenhado FORA dos limites do elemento e seria cortado sem essa margem. -->
+    <Grid>
+        <local:DependencyDialogView x:Name="View" Margin="28"/>
+    </Grid>
+</Window>

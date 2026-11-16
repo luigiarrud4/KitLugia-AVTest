@@ -822,9 +822,11 @@ namespace KitLugia.GUI.Pages
                 string kitLugiaSetup = Path.Combine(isoContents, "_KitLugiaSetup");
                 await Task.Run(() => Directory.CreateDirectory(kitLugiaSetup));
 
-                string kitLugiaExe = Environment.ProcessPath
-                                     ?? System.Reflection.Assembly.GetExecutingAssembly().Location
-                                     ?? AppContext.BaseDirectory.TrimEnd('\\') + "\\KitLugia.GUI.exe";
+                string kitLugiaExe = Environment.ProcessPath ?? "";
+                if (string.IsNullOrEmpty(kitLugiaExe))
+                    kitLugiaExe = KitLugia.Core.AppPaths.GetRunningExePath();
+                if (string.IsNullOrEmpty(kitLugiaExe))
+                    kitLugiaExe = KitLugia.Core.AppPaths.ResolveAppExePath(AppContext.BaseDirectory) ?? "";
                 if (File.Exists(kitLugiaExe))
                 {
                     await Task.Run(() => File.Copy(kitLugiaExe, Path.Combine(kitLugiaSetup, "KitLugia.exe"), true));

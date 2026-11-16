@@ -15,13 +15,13 @@
         
         <!-- T&#xED;tulo -->
         <TextBlock Grid.Row="0" Text="&#x1F310; Servidor LAN" FontSize="16" FontWeight="Bold" 
-                   Foreground="{StaticResource AccentColor}" Margin="0,0,0,15" HorizontalAlignment="Center"/>
+                   Foreground="{DynamicResource AccentColor}" Margin="0,0,0,15" HorizontalAlignment="Center"/>
         
         <!-- Porta -->
         <TextBlock Grid.Row="1" Text="Porta:" FontSize="12" 
                    Foreground="#AAA" Margin="0,0,0,3"/>
         <TextBox x:Name="TxtPort" Grid.Row="2" Text="25565" Height="30" 
-                 Background="#252525" Foreground="White" BorderBrush="#FFD700" BorderThickness="2"
+                 Background="{DynamicResource Surface2}" Foreground="White" BorderBrush="{DynamicResource AccentColor}" BorderThickness="2"
                  Padding="8,5" FontSize="12" Margin="0,0,0,15"/>
         
         <!-- Bot&#xF5;es -->
@@ -30,7 +30,7 @@
                     Background="Transparent" BorderBrush="#666" Foreground="#AAA"
                     Click="BtnCancel_Click"/>
             <Button Content="Ativar" Width="80" Height="30"
-                    Background="{StaticResource AccentColor}" Foreground="White" BorderThickness="0"
+                    Background="{DynamicResource AccentColor}" Foreground="White" BorderThickness="0"
                     Click="BtnActivate_Click"/>
         </StackPanel>
     </Grid>

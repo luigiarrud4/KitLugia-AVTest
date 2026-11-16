@@ -21,7 +21,7 @@
                 <ItemsControl x:Name="AppList">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Background="#252525" CornerRadius="6" Padding="10,7" Margin="0,0,0,5"
+                            <Border Background="{DynamicResource Surface2}" CornerRadius="6" Padding="10,7" Margin="0,0,0,5"
                                     Cursor="Hand">
                                 <Border.Style>
                                     <Style TargetType="Border">
@@ -30,7 +30,7 @@
                                         <Style.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter Property="Background" Value="#333"/>
-                                                <Setter Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
                                             </Trigger>
                                         </Style.Triggers>
                                     </Style>
@@ -47,7 +47,7 @@
                                         <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
                                         <TextBlock Text="{Binding FullCommand}" Foreground="#666" FontSize="10" TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="&#x2795;" Foreground="{StaticResource AccentColor}" 
+                                    <TextBlock Grid.Column="1" Text="&#x2795;" Foreground="{DynamicResource AccentColor}" 
                                                FontSize="16" VerticalAlignment="Center" Margin="10,0,0,0"/>
                                 </Grid>
                             </Border>

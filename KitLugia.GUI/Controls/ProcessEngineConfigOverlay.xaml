@@ -6,7 +6,7 @@
              TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
     <Grid Background="#CC000000">
-        <Border x:Name="RootBorder" Background="#1A1A1A" BorderBrush="#FFD700" BorderThickness="1"
+        <Border x:Name="RootBorder" Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1"
                 CornerRadius="10" Width="660" MaxHeight="700"
                 HorizontalAlignment="Center" VerticalAlignment="Center">
             <Border.Effect>
@@ -26,7 +26,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock Text="&#x2699;&#xFE0F; Configurações do Processo"
-                                   FontSize="17" FontWeight="Bold" Foreground="#FFD700"/>
+                                   FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
                         <TextBlock Text="Ajustes aplicados automaticamente enquanto este processo estiver na lista do RAM Limiter."
                                    FontSize="11" Foreground="#999" Margin="0,2,0,0"/>
                     </StackPanel>
@@ -50,7 +50,7 @@
                             <controls:InfoButton Grid.Column="0" ToolTipText="Classe de prioridade base do processo (o Windows escalona threads com base nela).&#x0a;&#x0a;• Normal: padrão do sistema.&#x0a;• AboveNormal/High: mais CPU quando há disputa — recomendado para o app que você está usando.&#x0a;• RealTime: NÃO use em apps comuns — pode travar o mouse/teclado se o processo travar.&#x0a;• Idle/BelowNormal: deixa outros processos na frente (bom para downloads e backups)."/>
                             <TextBlock Grid.Column="1" Text="Prioridade CPU" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
                             <ComboBox Grid.Column="2" x:Name="CboCpuPriority" SelectedIndex="4"
-                                      Background="#2d2d2d" Foreground="White" BorderBrush="#555"
+                                      Background="#2d2d2d" Foreground="White" BorderBrush="{DynamicResource BorderStrong}"
                                       Height="28" FontSize="12">
                                 <ComboBoxItem Content="Idle"/>
                                 <ComboBoxItem Content="BelowNormal"/>
@@ -70,7 +70,7 @@
                             <controls:InfoButton Grid.Column="0" ToolTipText="Só funciona em CPUs híbridas (Intel 12ª geração+ / Ryzen com P+E cores), Windows 11 24H2+.&#x0a;&#x0a;• P-Cores (Performance): força as threads nos núcleos rápidos — reduz micro-travamentos em jogos.&#x0a;• E-Cores (Efficiency): empurra para os núcleos econômicos — economiza energia, bom para tarefas em segundo plano."/>
                             <TextBlock Grid.Column="1" Text="Efficiency Mode" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
                             <ComboBox Grid.Column="2" x:Name="CboEfficiencyMode" SelectedIndex="0"
-                                      Background="#2d2d2d" Foreground="White" BorderBrush="#555"
+                                      Background="#2d2d2d" Foreground="White" BorderBrush="{DynamicResource BorderStrong}"
                                       Height="28" FontSize="12">
                                 <ComboBoxItem Content="P-Cores (Performance)"/>
                                 <ComboBoxItem Content="E-Cores (Efficiency)"/>
@@ -88,7 +88,7 @@
                             <controls:InfoButton Grid.Column="0" ToolTipText="Prioridade das operações de disco (leitura/gravação).&#x0a;&#x0a;• Baixa: deixa outros programas lerem o disco primeiro — bom para apps que ficam gravando em segundo plano.&#x0a;• Normal: padrão.&#x0a;• Alta/Critical: o disco prioriza este processo — use em apps que precisam carregar muita coisa rápido."/>
                             <TextBlock Grid.Column="1" Text="Prioridade I/O" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
                             <ComboBox Grid.Column="2" x:Name="CboIoPriority" SelectedIndex="1"
-                                      Background="#2d2d2d" Foreground="White" BorderBrush="#555"
+                                      Background="#2d2d2d" Foreground="White" BorderBrush="{DynamicResource BorderStrong}"
                                       Height="28" FontSize="12">
                                 <ComboBoxItem Content="Baixa (0)"/>
                                 <ComboBoxItem Content="Normal (1)"/>
@@ -106,7 +106,7 @@
                             <controls:InfoButton Grid.Column="0" ToolTipText="Prioridade das páginas de memória do processo.&#x0a;&#x0a;Escala oficial do Windows: 1=Very Low até 5=Normal (que é o PADRÃO).&#x0a;Não existe &quot;acima do normal&quot;: 5 já é o topo. Para manter o processo na RAM por mais tempo o que se mexe é a memória do PROCESSO em si, não a página."/>
                             <TextBlock Grid.Column="1" Text="Prioridade Página" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
                             <ComboBox Grid.Column="2" x:Name="CboPagePriority" SelectedIndex="4"
-                                      Background="#2d2d2d" Foreground="White" BorderBrush="#555"
+                                      Background="#2d2d2d" Foreground="White" BorderBrush="{DynamicResource BorderStrong}"
                                       Height="28" FontSize="12">
                                 <ComboBoxItem Content="Very Low (1)"/>
                                 <ComboBoxItem Content="Low (2)"/>
@@ -125,7 +125,7 @@
                             <controls:InfoButton Grid.Column="0" ToolTipText="Prioridade de memória: quem é escolhido primeiro para ser compactado/despejado quando a RAM fica curta.&#x0a;&#x0a;Escala oficial: 1=Very Low até 5=Normal (padrão).&#x0a;• Very Low: o SO recolhe memória deste processo primeiro — bom para processos pesados em segundo plano.&#x0a;• Normal: melhor para o app que você não quer que trave."/>
                             <TextBlock Grid.Column="1" Text="Memory Priority" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
                             <ComboBox Grid.Column="2" x:Name="CboMemoryPriority" SelectedIndex="4"
-                                      Background="#2d2d2d" Foreground="White" BorderBrush="#555"
+                                      Background="#2d2d2d" Foreground="White" BorderBrush="{DynamicResource BorderStrong}"
                                       Height="28" FontSize="12">
                                 <ComboBoxItem Content="Very Low (1)"/>
                                 <ComboBoxItem Content="Low (2)"/>
@@ -174,7 +174,7 @@
                             <controls:InfoButton Grid.Column="0" ToolTipText="Como o desaceleramento é aplicado:&#x0a;&#x0a;• Clássico: prioridade BelowNormal + memória muito baixa — compatível com tudo.&#x0a;• EcoQoS: API oficial do Windows 11 (mesmo mecanismo do Modo Eficiência do Gerenciador de Tarefas) — mais suave, não mexe na prioridade.&#x0a;• Hard Cap: trava REAL de CPU via Job Object — o processo não passa do limite definido enquanto estiver acima do gatilho."/>
                             <TextBlock Grid.Column="1" Text="Modo do ProBalance" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
                             <ComboBox Grid.Column="2" x:Name="CboProBalanceMode" SelectedIndex="0"
-                                      Background="#2d2d2d" Foreground="White" BorderBrush="#555"
+                                      Background="#2d2d2d" Foreground="White" BorderBrush="{DynamicResource BorderStrong}"
                                       Height="28" FontSize="12" SelectionChanged="CboProBalanceMode_SelectionChanged">
                                 <ComboBoxItem Content="Clássico (BelowNormal)"/>
                                 <ComboBoxItem Content="EcoQoS (Oficial Win11)"/>
@@ -191,7 +191,7 @@
                             <controls:InfoButton Grid.Column="0" ToolTipText="Porcentagem de CPU (de todos os núcleos) que dispara o ProBalance.&#x0a;&#x0a;• 5% = agressivo: qualquer usozinho já desacelera (bom para economizar recursos).&#x0a;• 30%+ = conservador: só age quando o processo está realmente pesado.&#x0a;&#x0a;No modo Hard Cap, este valor vira o TETO máximo real de CPU."/>
                             <TextBlock Grid.Column="1" Text="Limite CPU (%)" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
                             <TextBox Grid.Column="2" x:Name="TxtProBalanceThreshold" Text="5"
-                                     Background="#2d2d2d" Foreground="White" BorderBrush="#555"
+                                     Background="#2d2d2d" Foreground="White" BorderBrush="{DynamicResource BorderStrong}"
                                      Height="28" FontSize="12" Padding="6,0"/>
                         </Grid>
 
@@ -227,7 +227,7 @@
                             <controls:InfoButton Grid.Column="0" ToolTipText="Teto permanente de CPU (1-99%).&#x0a;Exemplo: 50% num PC de 8 núcleos = o processo usa no máximo 4 núcleos completos."/>
                             <TextBlock Grid.Column="1" Text="CPU Máximo (%)" Foreground="#CCC" FontSize="12" VerticalAlignment="Center"/>
                             <TextBox Grid.Column="2" x:Name="TxtCpuLimitPercent" Text="50"
-                                     Background="#2d2d2d" Foreground="White" BorderBrush="#555"
+                                     Background="#2d2d2d" Foreground="White" BorderBrush="{DynamicResource BorderStrong}"
                                      Height="28" FontSize="12" Padding="6,0"/>
                         </Grid>
 
@@ -278,7 +278,7 @@
                                 Background="#444" Foreground="White" BorderThickness="0"
                                 FontSize="12" Cursor="Hand"/>
                         <Button x:Name="BtnSave" Content="Salvar" Width="100" Height="34"
-                                Background="#FFD700" Foreground="Black" BorderThickness="0"
+                                Background="{DynamicResource AccentColor}" Foreground="Black" BorderThickness="0"
                                 FontSize="12" FontWeight="Bold" Cursor="Hand"
                                 Click="BtnSave_Click"/>
                     </StackPanel>

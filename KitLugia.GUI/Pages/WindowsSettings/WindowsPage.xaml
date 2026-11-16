@@ -12,7 +12,7 @@
                 <!-- CABECALHO -->
                 <TextBlock Text="&#x2699;&#xFE0F; Configuracoes do Windows" FontSize="36" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,8"/>
                 <TextBlock Text="Gerencie teclado, mouse, acessibilidade, idioma, som, energia e mais — tudo integrado ao Windows." 
-                           Foreground="#A0A0A0" FontSize="13" Margin="0,0,0,30" TextWrapping="Wrap"/>
+                           Foreground="{DynamicResource TextDescription}" FontSize="13" Margin="0,0,0,30" TextWrapping="Wrap"/>
 
                 <!-- LINHA DE CARDS: FORCE STOP | MENU DE CONTEXTO | ADICIONAR AO MENU -->
                 <Grid Margin="0,0,0,25">

@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Consolas, Segoe UI Emoji"
         TextElement.Foreground="White"
-        Background="#0F0F0F"
+        Background="{DynamicResource Surface0}"
         ShowInTaskbar="False">
     <Window.Resources>
         <Style x:Key="GuideSection" TargetType="TextBlock">
@@ -28,7 +28,7 @@
         <WindowChrome CaptionHeight="0" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" ResizeBorderThickness="4"/>
     </WindowChrome.WindowChrome>
 
-    <Border BorderBrush="#FFD700" BorderThickness="1">
+    <Border BorderBrush="{DynamicResource AccentColor}" BorderThickness="1">
         <Grid Margin="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -38,7 +38,7 @@
             <!-- Header -->
             <Grid Grid.Row="0">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="💡 Guia do Explorador de PATH" FontSize="16" FontWeight="SemiBold" Foreground="#FFD700"/>
+                    <TextBlock Text="💡 Guia do Explorador de PATH" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}"/>
                     <TextBlock Text="Entenda as cores, os avisos e como adicionar caminhos"
                                FontSize="11" Foreground="#777" Margin="12,4,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
@@ -58,9 +58,9 @@
                             <ColumnDefinition Width="30"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="✅" Foreground="#4CAF50" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="✅" Foreground="{DynamicResource SuccessBrush}" FontSize="13" VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="1" Style="{StaticResource GuideBody}" Margin="0">
-                            <Run Text="Verde" FontWeight="Bold" Foreground="#4CAF50"/>
+                            <Run Text="Verde" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}"/>
                             <Run Text=" - a pasta existe. Tudo certo, nada a fazer."/>
                         </TextBlock>
                     </Grid>
@@ -80,9 +80,9 @@
                             <ColumnDefinition Width="30"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="🔄" Foreground="#FFD700" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="🔄" Foreground="{DynamicResource AccentColor}" FontSize="13" VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="1" Style="{StaticResource GuideBody}" Margin="0">
-                            <Run Text="Dourado" FontWeight="Bold" Foreground="#FFD700"/>
+                            <Run Text="Dourado" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
                             <Run Text=" - caminho no lugar errado: entrada de sistema no PATH do Usuário (ou de usuário no PATH do Sistema)."/>
                         </TextBlock>
                     </Grid>

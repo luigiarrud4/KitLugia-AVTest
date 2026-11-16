@@ -79,8 +79,8 @@ namespace KitLugia.Core
                     $"Ambiente de recuperação Alpine implantado com sucesso!\n\n" +
                     $"Operação: Reduzir {driveLetter}: em {shrinkSizeMb}MB, criar partição {newPartitionLabel}\n\n" +
                     $"{bootMode}\n\n" +
-                    $"⚠️ O sistema será reiniciado. O rEFInd iniciará automaticamente o Alpine Linux.\n" +
-                    $"A operação será executada e o Windows será reiniciado em seguida.");
+                    $"⚠️ Reinicie manualmente para iniciar o Alpine Linux pelo rEFInd.\n" +
+                    $"Após o shrink, o ambiente reiniciará o Windows.");
             }
             catch (Exception ex)
             {

@@ -17,7 +17,7 @@
             <!-- Header -->
             <StackPanel Margin="0,0,0,30">
                 <TextBlock Style="{StaticResource PageTitleStyle}" Text="Gerenciador de Privacidade" Margin="0,0,0,10"/>
-                <TextBlock Text="Controle a telemetria, rastreamento e dados enviados para a Microsoft." Foreground="{StaticResource TextSecondary}"/>
+                <TextBlock Text="Controle a telemetria, rastreamento e dados enviados para a Microsoft." Foreground="{DynamicResource TextSecondary}"/>
             </StackPanel>
 
             <!-- Status Geral: protecao POR NIVEL (verdes/amarelos/vermelhos) -->
@@ -29,7 +29,7 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="PROTE&#xC7;&#xC3;O ATUAL" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                        <TextBlock Text="PROTE&#xC7;&#xC3;O ATUAL" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,10"/>
 
                         <!-- Verdes -->
                         <Grid Margin="0,2">
@@ -39,10 +39,10 @@
                                 <ColumnDefinition Width="80"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Ellipse Width="9" Height="9" Fill="#4CAF50" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="1" Text="Seguros (Recomendado)" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="2" x:Name="TxtProtSafe" Text="0 / 0" FontSize="12" FontWeight="Bold" Foreground="#4CAF50" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                            <ProgressBar Grid.Column="3" x:Name="PbSafe" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="#4CAF50" Background="#222222" BorderThickness="0" Margin="14,0,0,0" VerticalAlignment="Center"/>
+                            <Ellipse Width="9" Height="9" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="Seguros (Recomendado)" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" x:Name="TxtProtSafe" Text="0 / 0" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                            <ProgressBar Grid.Column="3" x:Name="PbSafe" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="{DynamicResource SuccessBrush}" Background="#222222" BorderThickness="0" Margin="14,0,0,0" VerticalAlignment="Center"/>
                         </Grid>
 
                         <!-- Amarelos -->
@@ -54,7 +54,7 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Ellipse Width="9" Height="9" Fill="#FFA500" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="1" Text="Moderados (Limitado)" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="Moderados (Limitado)" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="8,0,0,0" VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="2" x:Name="TxtProtModerate" Text="0 / 0" FontSize="12" FontWeight="Bold" Foreground="#FFA500" Margin="12,0,0,0" VerticalAlignment="Center"/>
                             <ProgressBar Grid.Column="3" x:Name="PbModerate" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="#FFA500" Background="#222222" BorderThickness="0" Margin="14,0,0,0" VerticalAlignment="Center"/>
                         </Grid>
@@ -67,14 +67,14 @@
                                 <ColumnDefinition Width="80"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Ellipse Width="9" Height="9" Fill="#C42B1C" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="1" Text="Perigosos (Não Recomendado)" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            <Ellipse Width="9" Height="9" Fill="{DynamicResource ErrorBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="Perigosos (Não Recomendado)" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="8,0,0,0" VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="2" x:Name="TxtProtDanger" Text="0 / 0" FontSize="12" FontWeight="Bold" Foreground="#E57373" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                            <ProgressBar Grid.Column="3" x:Name="PbDanger" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="#C42B1C" Background="#222222" BorderThickness="0" Margin="14,0,0,0" VerticalAlignment="Center"/>
+                            <ProgressBar Grid.Column="3" x:Name="PbDanger" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="{DynamicResource ErrorBrush}" Background="#222222" BorderThickness="0" Margin="14,0,0,0" VerticalAlignment="Center"/>
                         </Grid>
 
                         <!-- Resultado -->
-                        <TextBlock x:Name="TxtPrivacyScore" Text="Carregando..." FontSize="16" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,12,0,0"/>
+                        <TextBlock x:Name="TxtPrivacyScore" Text="Carregando..." FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,12,0,0"/>
                     </StackPanel>
 
                     <Button Grid.Column="1" x:Name="BtnRefreshStatus" Content="&#x27F3; Atualizar" Click="BtnRefreshStatus_Click" 
@@ -92,7 +92,7 @@
 
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="PRESETS PERSONALIZADOS" FontSize="16" FontWeight="Bold" Foreground="#E8B84E"/>
-                        <TextBlock Text="Escolha item por item o que aplicar: seguros, moderados e perigosos — como no O&amp;O ShutUp10. Itens desmarcados voltam ao padrão do Windows." FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,12,0"/>
+                        <TextBlock Text="Escolha item por item o que aplicar: seguros, moderados e perigosos — como no O&amp;O ShutUp10. Itens desmarcados voltam ao padrão do Windows." FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,12,0"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -109,7 +109,7 @@
             <!-- Lista Detalhada -->
             <StackPanel Margin="0,0,0,15">
                 <!-- T&#xED;tulo -->
-                <TextBlock Text="Configura&#xE7;&#xF5;es Detalhadas" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10"/>
+                <TextBlock Text="Configura&#xE7;&#xF5;es Detalhadas" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,10"/>
 
                 <!-- Bot&#xF5;es de A&#xE7;&#xE3;o -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
@@ -136,18 +136,18 @@
                     <Button x:Name="BtnFilterMenu" Grid.Column="1" Click="BtnFilterMenu_Click" Style="{StaticResource SecondaryButtonStyle}" Width="60" ToolTip="Filtrar por n&#xED;vel">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#x2630;" FontSize="16" Margin="0,0,5,0"/>
-                            <Ellipse x:Name="FilterIndicator" Width="10" Height="10" Fill="#FFD700" VerticalAlignment="Center"/>
+                            <Ellipse x:Name="FilterIndicator" Width="10" Height="10" Fill="{DynamicResource AccentColor}" VerticalAlignment="Center"/>
                         </StackPanel>
                         <Button.ContextMenu>
                             <ContextMenu x:Name="FilterContextMenu" Style="{StaticResource ServiceContextMenu}">
                                 <MenuItem Header="Todos" Click="MenuItemFilter_Click" Tag="All" Style="{StaticResource ServiceMenuItem}">
                                     <MenuItem.Icon>
-                                        <Ellipse Width="12" Height="12" Fill="#FFD700"/>
+                                        <Ellipse Width="12" Height="12" Fill="{DynamicResource AccentColor}"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
-                                <MenuItem Header="Recomendado" Click="MenuItemFilter_Click" Tag="Recommended" Style="{StaticResource ServiceMenuItem}" Foreground="#4CAF50">
+                                <MenuItem Header="Recomendado" Click="MenuItemFilter_Click" Tag="Recommended" Style="{StaticResource ServiceMenuItem}" Foreground="{DynamicResource SuccessBrush}">
                                     <MenuItem.Icon>
-                                        <Ellipse Width="12" Height="12" Fill="#4CAF50"/>
+                                        <Ellipse Width="12" Height="12" Fill="{DynamicResource SuccessBrush}"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
                                 <MenuItem Header="Limitado" Click="MenuItemFilter_Click" Tag="Limited" Style="{StaticResource ServiceMenuItem}" Foreground="#FFA500">
@@ -155,9 +155,9 @@
                                         <Ellipse Width="12" Height="12" Fill="#FFA500"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
-                                <MenuItem Header="N&#xE3;o Recomendado" Click="MenuItemFilter_Click" Tag="NotRecommended" Style="{StaticResource ServiceMenuItem}" Foreground="#C42B1C">
+                                <MenuItem Header="N&#xE3;o Recomendado" Click="MenuItemFilter_Click" Tag="NotRecommended" Style="{StaticResource ServiceMenuItem}" Foreground="{DynamicResource ErrorBrush}">
                                     <MenuItem.Icon>
-                                        <Ellipse Width="12" Height="12" Fill="#C42B1C"/>
+                                        <Ellipse Width="12" Height="12" Fill="{DynamicResource ErrorBrush}"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
                             </ContextMenu>
@@ -167,14 +167,14 @@
 
                 <!-- Legenda dos Indicadores -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                    <Ellipse Width="8" Height="8" Fill="#4CAF50" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="Recomendado" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,15,0" VerticalAlignment="Center"/>
+                    <Ellipse Width="8" Height="8" Fill="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Recomendado" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,0,15,0" VerticalAlignment="Center"/>
 
                     <Ellipse Width="8" Height="8" Fill="#FFA500" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="Limitado" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,15,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Limitado" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,0,15,0" VerticalAlignment="Center"/>
 
-                    <Ellipse Width="8" Height="8" Fill="#C42B1C" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="N&#xE3;o Recomendado" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                    <Ellipse Width="8" Height="8" Fill="{DynamicResource ErrorBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="N&#xE3;o Recomendado" FontSize="11" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center"/>
                 </StackPanel>
             </StackPanel>
 

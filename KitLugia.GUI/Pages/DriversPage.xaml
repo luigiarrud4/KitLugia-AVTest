@@ -13,7 +13,7 @@
 
         <Style TargetType="TabItem">
             <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Padding" Value="15,10"/>
             <Setter Property="Template">
@@ -36,7 +36,7 @@
 
         <ContextMenu x:Key="DriverContextMenu" Style="{StaticResource ServiceContextMenu}">
             <MenuItem Header="Desinstalar (For&#xE7;ar Remo&#xE7;&#xE3;o)" Click="CtxUninstall_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#FF6F61" FontWeight="Bold"/>
-            <Separator Background="#333"/>
+            <Separator Background="{DynamicResource BorderSubtle}"/>
             <MenuItem Header="Copiar Nome" Click="CtxCopyName_Click" Style="{StaticResource ServiceMenuItem}"/>
             <MenuItem Header="Copiar ID de Hardware" Click="CtxCopyId_Click" Style="{StaticResource ServiceMenuItem}"/>
         </ContextMenu>
@@ -79,7 +79,7 @@
                         <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="15" MinHeight="140">
                             <StackPanel>
                                 <TextBlock Text="&#x1F4E5; Instalar Driver" Foreground="White" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
-                                <TextBlock Text="Instala drivers de arquivos CAB, ZIP ou de uma pasta espec&#xED;fica." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
+                                <TextBlock Text="Instala drivers de arquivos CAB, ZIP ou de uma pasta espec&#xED;fica." Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
                                 <Grid VerticalAlignment="Bottom">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -92,13 +92,13 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="{StaticResource AccentColor}" MinHeight="140">
+                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="{DynamicResource AccentColor}" MinHeight="140">
                             <Border.Effect>
                                 <DropShadowEffect Color="#FFD700" BlurRadius="10" Opacity="0.1" ShadowDepth="0"/>
                             </Border.Effect>
                             <StackPanel>
-                                <TextBlock Text="&#x1F4BE; Backup Completo" Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
-                                <TextBlock Text="Cria backup de todos os drivers instalados para restaura&#xE7;&#xE3;o r&#xE1;pida." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
+                                <TextBlock Text="&#x1F4BE; Backup Completo" Foreground="{DynamicResource AccentColor}" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
+                                <TextBlock Text="Cria backup de todos os drivers instalados para restaura&#xE7;&#xE3;o r&#xE1;pida." Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
                                 <Button Content="Criar Backup" Click="BtnBackup_Click" Style="{StaticResource GoldButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
                             </StackPanel>
                         </Border>
@@ -106,7 +106,7 @@
                         <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="15" MinHeight="140">
                             <StackPanel>
                                 <TextBlock Text="&#x1F4C4; Exportar Lista" Foreground="White" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
-                                <TextBlock Text="Exporta a lista de drivers para arquivo TXT para an&#xE1;lise." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
+                                <TextBlock Text="Exporta a lista de drivers para arquivo TXT para an&#xE1;lise." Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
                                 <Button Content="Exportar TXT" Click="BtnExportList_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
                             </StackPanel>
                         </Border>
@@ -126,7 +126,7 @@
                                      TextChanged="TxtFilter_TextChanged"/>
 
                             <!-- Contador de Drivers -->
-                            <TextBlock x:Name="TxtCount" Text="Carregando..." Foreground="{StaticResource AccentColor}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="TxtCount" Text="Carregando..." Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"/>
                         </StackPanel>
 
                         <!-- Status -->
@@ -140,7 +140,7 @@
                                              Hint="Ajuste o filtro ou clique em Analisar."/>
 
                     <!-- TABELA DE DRIVERS -->
-                    <Border Grid.Row="2" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
+                    <Border Grid.Row="2" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
                         <DataGrid x:Name="GridDrivers" SelectionMode="Extended">
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Width="40" CanUserResize="False" CanUserSort="False">
@@ -232,7 +232,7 @@
                             <DataGrid.ContextMenu>
                                 <ContextMenu Style="{StaticResource ServiceContextMenu}">
                                     <MenuItem Header="Desinstalar (For&#xE7;ar Remo&#xE7;&#xE3;o)" Click="CtxUninstall_Click" Style="{StaticResource ServiceMenuItem}" Foreground="#FF6F61" FontWeight="Bold"/>
-                                    <Separator Background="#333"/>
+                                    <Separator Background="{DynamicResource BorderSubtle}"/>
                                     <MenuItem Header="Copiar Nome" Click="CtxCopyName_Click" Style="{StaticResource ServiceMenuItem}"/>
                                     <MenuItem Header="Copiar ID de Hardware" Click="CtxCopyId_Click" Style="{StaticResource ServiceMenuItem}"/>
                                 </ContextMenu>
@@ -262,28 +262,28 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Background="#1A1A1A" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
+                        <Border Grid.Column="0" Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
                             <StackPanel>
                                 <TextBlock Text="Total" Foreground="#888" FontSize="11" FontWeight="SemiBold"/>
                                 <TextBlock x:Name="TxtKernelTotal" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
                                 <TextBlock Text="Type 1/2 (Kernel)" Foreground="#666" FontSize="11"/>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="1" Background="#1A1A1A" BorderBrush="#4CAF50" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
+                        <Border Grid.Column="1" Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource SuccessBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
                             <StackPanel>
-                                <TextBlock Text="Microsoft" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
+                                <TextBlock Text="Microsoft" Foreground="{DynamicResource SuccessBrush}" FontSize="11" FontWeight="Bold"/>
                                 <TextBlock x:Name="TxtKernelMs" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
                                 <TextBlock Text="Inbox / assinado MS" Foreground="#666" FontSize="11"/>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="2" Background="#1A1A1A" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
+                        <Border Grid.Column="2" Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
                             <StackPanel>
-                                <TextBlock Text="Terceiros" Foreground="#FFD700" FontSize="11" FontWeight="Bold"/>
+                                <TextBlock Text="Terceiros" Foreground="{DynamicResource AccentColor}" FontSize="11" FontWeight="Bold"/>
                                 <TextBlock x:Name="TxtKernelThird" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
                                 <TextBlock Text="AVG/LDPlayer/VMware..." Foreground="#666" FontSize="11"/>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="3" Background="#1A1A1A" BorderBrush="#FF3333" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
+                        <Border Grid.Column="3" Background="{DynamicResource Surface1}" BorderBrush="#FF3333" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
                             <StackPanel>
                                 <TextBlock Text="⚠ Boot/System" Foreground="#FF5555" FontSize="11" FontWeight="Bold"/>
                                 <TextBlock x:Name="TxtKernelRisk" Text="—" Foreground="White" FontSize="22" FontWeight="Bold"/>
@@ -292,11 +292,11 @@
                         </Border>
                         <StackPanel Grid.Column="4" VerticalAlignment="Center" Margin="12,0,0,0">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                <Ellipse Width="10" Height="10" Fill="#4CAF50" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <Ellipse Width="10" Height="10" Fill="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="Microsoft" Foreground="#CCC" FontSize="11" VerticalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                <Ellipse Width="10" Height="10" Fill="#FFD700" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <Ellipse Width="10" Height="10" Fill="{DynamicResource AccentColor}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="Terceiros" Foreground="#CCC" FontSize="11" VerticalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal">
@@ -325,7 +325,7 @@
                             </ComboBox>
                             <CheckBox x:Name="ChkKernelThirdOnly" Content="Só terceiros" Foreground="#AAA" VerticalAlignment="Center" Margin="0,0,10,0" Click="ChkKernelThirdOnly_Click"/>
                             <CheckBox x:Name="ChkKernelRiskOnly" Content="Só Boot/System terceiros" Foreground="#FF5555" VerticalAlignment="Center" Margin="0,0,10,0" Click="ChkKernelRiskOnly_Click"/>
-                            <TextBlock x:Name="TxtKernelCount" Text="" Foreground="{StaticResource AccentColor}" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Margin="8,0,0,0"/>
+                            <TextBlock x:Name="TxtKernelCount" Text="" Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Margin="8,0,0,0"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
                             <Button Content="Recarregar" Click="BtnReloadKernel_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30" Margin="0,0,8,0"/>
@@ -340,7 +340,7 @@
                                              Hint="A lista fica vazia quando nada corresponde ao filtro."/>
 
                     <!-- TABELA -->
-                    <Border Grid.Row="2" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
+                    <Border Grid.Row="2" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
                         <DataGrid x:Name="GridKernel" SelectionMode="Single" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingStackPanel.VirtualizationMode="Recycling" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="None" Background="#111" RowBackground="#111" AlternatingRowBackground="#1A1A1A">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="[ ]" Binding="{Binding StartIcon}" Width="45" SortMemberPath="StartValue">
@@ -498,8 +498,8 @@
                                     <MenuItem Header="Copiar nome" Click="CtxKernelCopyName_Click" Style="{StaticResource ServiceMenuItem}"/>
                                     <MenuItem Header="Copiar caminho" Click="CtxKernelCopyPath_Click" Style="{StaticResource ServiceMenuItem}"/>
                                     <MenuItem Header="Abrir pasta do arquivo" Click="CtxKernelOpenFolder_Click" Style="{StaticResource ServiceMenuItem}"/>
-                                    <Separator Background="#333"/>
-                                    <MenuItem Header="Ver no relatório JSON" Click="CtxKernelViewJson_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{StaticResource AccentColor}"/>
+                                    <Separator Background="{DynamicResource BorderSubtle}"/>
+                                    <MenuItem Header="Ver no relatório JSON" Click="CtxKernelViewJson_Click" Style="{StaticResource ServiceMenuItem}" Foreground="{DynamicResource AccentColor}"/>
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                         </DataGrid>
@@ -534,18 +534,18 @@
                             </Border.Effect>
                             <StackPanel>
                                 <TextBlock Text="&#x26A0;&#xFE0F; ATIVAR VERIFIER" Foreground="#FF5555" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
-                                <TextBlock Text="For&#xE7;a o Windows a travar (BSOD) se encontrar erro no driver. Use apenas para diagnosticar telas azuis." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
+                                <TextBlock Text="For&#xE7;a o Windows a travar (BSOD) se encontrar erro no driver. Use apenas para diagnosticar telas azuis." Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
                                 <Button Content="ATIVAR (Estresse)" Click="BtnEnableVerifier_Click" Style="{StaticResource SecondaryButtonStyle}" Height="30" Foreground="#FF5555" BorderBrush="#FF5555" VerticalAlignment="Bottom"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="{StaticResource AccentColor}" MinHeight="140">
+                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="15" BorderBrush="{DynamicResource AccentColor}" MinHeight="140">
                             <Border.Effect>
                                 <DropShadowEffect Color="#FFD700" BlurRadius="10" Opacity="0.1" ShadowDepth="0"/>
                             </Border.Effect>
                             <StackPanel>
-                                <TextBlock Text="&#x2705; DESATIVAR / RESETAR" Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
-                                <TextBlock Text="Desativa o Verifier e restaura o boot normal. Use se o PC entrar em loop de reinicializa&#xE7;&#xE3;o." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
+                                <TextBlock Text="&#x2705; DESATIVAR / RESETAR" Foreground="{DynamicResource AccentColor}" FontWeight="Bold" FontSize="16" Margin="0,0,0,5"/>
+                                <TextBlock Text="Desativa o Verifier e restaura o boot normal. Use se o PC entrar em loop de reinicializa&#xE7;&#xE3;o." Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,15"/>
                                 <Button Content="DESATIVAR" Click="BtnDisableVerifier_Click" Style="{StaticResource GoldButtonStyle}" Height="30" VerticalAlignment="Bottom"/>
                             </StackPanel>
                         </Border>
@@ -561,7 +561,7 @@
                         <StackPanel Grid.Column="0" Margin="0,0,30,0">
                             <TextBlock Text="Estado Atual do Driver Verifier" FontSize="18" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
                             
-                            <Border Background="#1A1A1A" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Padding="20" Margin="0,0,0,20">
+                            <Border Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="6" Padding="20" Margin="0,0,0,20">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -585,7 +585,7 @@
                         <!-- Dicas Laterais -->
                         <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="20" VerticalAlignment="Top">
                             <StackPanel>
-                                <TextBlock Text="Como Usar" FontWeight="Bold" Foreground="{StaticResource AccentColor}" FontSize="13" Margin="0,0,0,15"/>
+                                <TextBlock Text="Como Usar" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" FontSize="13" Margin="0,0,0,15"/>
 
                                 <TextBlock Text="1. Ative o Verifier" Foreground="White" Margin="0,0,0,5"/>
                                 <TextBlock Text="O Windows pedir&#xE1; reinicializa&#xE7;&#xE3;o." Foreground="#777" FontSize="11" Margin="0,0,0,15"/>
@@ -607,11 +607,6 @@
         </TabControl>
 
         <!-- Loading Overlay -->
-        <Grid x:Name="LoadingOverlay" Grid.Row="0" Grid.RowSpan="2" Background="#D9000000" Visibility="Collapsed" Panel.ZIndex="99">
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock Text="&#x2699;&#xFE0F;" FontSize="40" HorizontalAlignment="Center" Foreground="{StaticResource AccentColor}"/>
-                <TextBlock x:Name="TxtLoadingMsg" Text="Processando..." Foreground="White" Margin="0,10,0,0" FontSize="16"/>
-            </StackPanel>
-        </Grid>
+        <controls:AreaLoadingOverlay x:Name="LoadingOverlay" Grid.Row="0" Grid.RowSpan="2" Visibility="Collapsed" Panel.ZIndex="99" Message="Processando..."/>
     </Grid>
 </Page>

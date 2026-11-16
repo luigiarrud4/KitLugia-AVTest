@@ -249,7 +249,7 @@
                                 </Grid.RowDefinitions>
 
                                 <StackPanel Grid.Row="0" Margin="0,0,0,14">
-                                    <TextBlock Text="&#x1F451; Assumir Propriedade" FontSize="16" FontWeight="SemiBold" Foreground="#FFD700"/>
+                                    <TextBlock Text="&#x1F451; Assumir Propriedade" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}"/>
                                     <TextBlock Text="Cole o caminho e assuma controle total (TrustedInstaller → Administradores). Usa FileTakeOwnership in-process, zero spawn." FontSize="12" Foreground="#888" Margin="0,2,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
 
@@ -288,8 +288,8 @@
                                         <TextBlock x:Name="TxtTakeOwnResult" Text="" FontSize="13" Foreground="#CCC" TextWrapping="Wrap"/>
                                         <TextBlock x:Name="TxtTakeOwnDetail" Text="" FontSize="11" Foreground="#888" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         <Grid Margin="0,10,0,0">
-                                            <ProgressBar x:Name="TakeOwnProgress" Height="6" Visibility="Collapsed" IsIndeterminate="True" Foreground="#FFD700" Background="#222" Minimum="0" Maximum="100" Value="0"/>
-                                            <TextBlock x:Name="TxtTakeOwnProgress" Text="" FontSize="11" Foreground="#FFD700" HorizontalAlignment="Right" Margin="0,-16,0,0" Visibility="Collapsed"/>
+                                            <ProgressBar x:Name="TakeOwnProgress" Height="6" Visibility="Collapsed" IsIndeterminate="True" Foreground="{DynamicResource AccentColor}" Background="#222" Minimum="0" Maximum="100" Value="0"/>
+                                            <TextBlock x:Name="TxtTakeOwnProgress" Text="" FontSize="11" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Right" Margin="0,-16,0,0" Visibility="Collapsed"/>
                                         </Grid>
                                         <TextBlock x:Name="TxtTakeOwnCurrentFile" Text="" FontSize="11" Foreground="#666" Margin="0,4,0,0" Visibility="Collapsed" TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
@@ -444,7 +444,7 @@
                                                     <TextBlock Text="{Binding Root}" FontSize="11" Foreground="#8888CC"/>
                                                 </Border>
                                             </StackPanel>
-                                            <TextBlock Text="{Binding Command}" FontSize="11" Foreground="#555" Margin="0,2,0,0" TextWrapping="Wrap" MaxHeight="24"/>
+                                            <TextBlock Text="{Binding Command}" FontSize="11" Foreground="{DynamicResource BorderStrong}" Margin="0,2,0,0" TextWrapping="Wrap" MaxHeight="24"/>
                                         </StackPanel>
 
                                         <Border Grid.Column="2" CornerRadius="3" Padding="5,1" VerticalAlignment="Center">
@@ -479,7 +479,7 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <TextBlock x:Name="TxtMenuEmpty" Text="Clique em Escanear para ver todas as entradas do menu de contexto" FontSize="12" Foreground="#555" TextAlignment="Center" Margin="0,10,0,0"/>
+                    <TextBlock x:Name="TxtMenuEmpty" Text="Clique em Escanear para ver todas as entradas do menu de contexto" FontSize="12" Foreground="{DynamicResource BorderStrong}" TextAlignment="Center" Margin="0,10,0,0"/>
                 </StackPanel>
             </Border>
 

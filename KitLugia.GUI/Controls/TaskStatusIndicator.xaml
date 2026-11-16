@@ -14,7 +14,7 @@
                      Fill="Transparent"/>
             <Ellipse x:Name="SpinnerArc"
                      Width="16" Height="16"
-                     Stroke="#FFD700" StrokeThickness="2.5"
+                     Stroke="{DynamicResource AccentColor}" StrokeThickness="2.5"
                      Fill="Transparent"
                      StrokeDashArray="5 15" StrokeDashOffset="0"
                      StrokeEndLineCap="Round" StrokeStartLineCap="Round"
@@ -23,7 +23,7 @@
 
         <TextBlock x:Name="IconSuccess"
                    Text="&#x2714;"
-                   Foreground="#4CAF50"
+                   Foreground="{DynamicResource SuccessBrush}"
                    FontSize="12" FontWeight="Bold"
                    VerticalAlignment="Center" HorizontalAlignment="Center"
                    Visibility="Collapsed"/>

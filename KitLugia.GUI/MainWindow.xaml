@@ -26,7 +26,7 @@
         <local:StackCountVisibilityConverter x:Key="StackCountVisibilityConverter"/>
     </Window.Resources>
 
-    <Border BorderBrush="{StaticResource AccentColor}" BorderThickness="1">
+    <Border BorderBrush="{DynamicResource AccentColor}" BorderThickness="1">
         <Grid>
             <!-- DIVIS&#xC3;O VERTICAL: CONTE&#xDA;DO EM CIMA, CONSOLE EM BAIXO -->
             <Grid.RowDefinitions>
@@ -58,32 +58,32 @@
                 </Border.Background>
                 <Grid>
                     <!-- Part&#xED;culas de fundo -->
-                    <Ellipse x:Name="Particle1" Width="10" Height="10" Fill="#FFD700" Opacity="0" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="100,100,0,0">
+                    <Ellipse x:Name="Particle1" Width="10" Height="10" Fill="{DynamicResource AccentColor}" Opacity="0" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="100,100,0,0">
                         <Ellipse.RenderTransform>
                             <TranslateTransform X="0" Y="0"/>
                         </Ellipse.RenderTransform>
                     </Ellipse>
-                    <Ellipse x:Name="Particle2" Width="15" Height="15" Fill="#FFD700" Opacity="0" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,150,100,0">
+                    <Ellipse x:Name="Particle2" Width="15" Height="15" Fill="{DynamicResource AccentColor}" Opacity="0" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,150,100,0">
                         <Ellipse.RenderTransform>
                             <TranslateTransform X="0" Y="0"/>
                         </Ellipse.RenderTransform>
                     </Ellipse>
-                    <Ellipse x:Name="Particle3" Width="8" Height="8" Fill="#FFD700" Opacity="0" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="150,0,0,100">
+                    <Ellipse x:Name="Particle3" Width="8" Height="8" Fill="{DynamicResource AccentColor}" Opacity="0" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="150,0,0,100">
                         <Ellipse.RenderTransform>
                             <TranslateTransform X="0" Y="0"/>
                         </Ellipse.RenderTransform>
                     </Ellipse>
-                    <Ellipse x:Name="Particle4" Width="12" Height="12" Fill="#FFD700" Opacity="0" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,120,120">
+                    <Ellipse x:Name="Particle4" Width="12" Height="12" Fill="{DynamicResource AccentColor}" Opacity="0" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,120,120">
                         <Ellipse.RenderTransform>
                             <TranslateTransform X="0" Y="0"/>
                         </Ellipse.RenderTransform>
                     </Ellipse>
-                    <Ellipse x:Name="Particle5" Width="6" Height="6" Fill="#FFD700" Opacity="0" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,80,0,0">
+                    <Ellipse x:Name="Particle5" Width="6" Height="6" Fill="{DynamicResource AccentColor}" Opacity="0" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,80,0,0">
                         <Ellipse.RenderTransform>
                             <TranslateTransform X="0" Y="0"/>
                         </Ellipse.RenderTransform>
                     </Ellipse>
-                    <Ellipse x:Name="Particle6" Width="10" Height="10" Fill="#FFD700" Opacity="0" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,80">
+                    <Ellipse x:Name="Particle6" Width="10" Height="10" Fill="{DynamicResource AccentColor}" Opacity="0" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,80">
                         <Ellipse.RenderTransform>
                             <TranslateTransform X="0" Y="0"/>
                         </Ellipse.RenderTransform>
@@ -100,7 +100,7 @@
                                    Text="KIT LUGIA"
                                    FontSize="72"
                                    FontWeight="Bold"
-                                   Foreground="{StaticResource AccentColor}"
+                                   Foreground="{DynamicResource AccentColor}"
                                    HorizontalAlignment="Center"
                                    TextAlignment="Center">
                             <TextBlock.Effect>
@@ -204,7 +204,7 @@
                         AutomationProperties.Name="GoodbyeDPI" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.1" controls:HoverZoom.DurationMs="150">
                     <Button.ContextMenu>
                         <ContextMenu x:Name="GoodbyeDPIContextMenu">
-                            <MenuItem Header="&#x1F4F6; GoodbyeDPI - Configura&#xE7;&#xF5;es" Foreground="#FFD700" FontWeight="Bold" IsEnabled="False"/>
+                            <MenuItem Header="&#x1F4F6; GoodbyeDPI - Configura&#xE7;&#xF5;es" Foreground="{DynamicResource AccentColor}" FontWeight="Bold" IsEnabled="False"/>
                             <Separator/>
                             <MenuItem Header="&#x1F30D; Modo: Qualquer Pa&#xED;s (-2) &#x2139;&#xFE0F;" x:Name="MenuModeAny" Click="GoodbyeDPI_ModeAny_Click" 
                                       ToolTip="Modo padr&#xE3;o que funciona em qualquer pa&#xED;s. Contorna DPI globalmente."/>
@@ -272,7 +272,7 @@
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4" RenderTransformOrigin="0.5,0.5">
                                 <Grid>
-                                    <TextBlock x:Name="monitorIcon" Text="&#x2699;&#xFE0F;" Foreground="#FFD700" FontWeight="Bold"
+                                    <TextBlock x:Name="monitorIcon" Text="&#x2699;&#xFE0F;" Foreground="{DynamicResource AccentColor}" FontWeight="Bold"
                                                HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14">
                                         <TextBlock.RenderTransform>
                                             <ScaleTransform x:Name="monitorIconScale" CenterX="7" CenterY="7" ScaleX="1" ScaleY="1"/>
@@ -445,8 +445,8 @@
             <!-- ========================================================= -->
             <!-- MENU LATERAL (ESQUERDA) -->
             <!-- ========================================================= -->
-            <Border x:Name="SidebarPanel" Grid.Row="0" Grid.Column="0" Background="{StaticResource SidebarBackground}"
-                    BorderThickness="0,0,1,0" BorderBrush="{StaticResource CardBorder}" Opacity="0" Width="280">
+            <Border x:Name="SidebarPanel" Grid.Row="0" Grid.Column="0" Background="{DynamicResource SidebarBackground}"
+                    BorderThickness="0,0,1,0" BorderBrush="{DynamicResource CardBorder}" Opacity="0" Width="280">
                 <Grid Margin="15,25">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -461,7 +461,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="KIT LUGIA" FontSize="18" FontWeight="Bold" Margin="5,0,0,5" Foreground="{StaticResource AccentColor}">
+                            <TextBlock Text="KIT LUGIA" FontSize="18" FontWeight="Bold" Margin="5,0,0,5" Foreground="{DynamicResource AccentColor}">
                                 <TextBlock.Effect>
                                     <DropShadowEffect Color="#FFD700" BlurRadius="12" ShadowDepth="0" Opacity="0.5"/>
                                 </TextBlock.Effect>
@@ -477,7 +477,7 @@
                                 VerticalAlignment="Center"
                                 Background="Transparent"
                                 BorderThickness="0"
-                                Foreground="{StaticResource AccentColor}"
+                                Foreground="{DynamicResource AccentColor}"
                                 ToolTip="Configura&#xE7;&#xF5;es do Kit Lugia"
                                 AutomationProperties.Name="Configurações"
                                 Click="BtnSettings_Click"
@@ -507,7 +507,7 @@
 
                             <Popup x:Name="SearchPopup" PlacementTarget="{Binding ElementName=TxtGlobalSearch}" 
                                    StaysOpen="False" AllowsTransparency="True" PopupAnimation="Slide" VerticalOffset="5">
-                                <Border Background="#1A1A1A" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="6" Width="250" MaxHeight="300">
+                                <Border Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="6" Width="250" MaxHeight="300">
                                     <Border.Effect>
                                         <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.8"/>
                                     </Border.Effect>
@@ -539,7 +539,7 @@
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource AccentColor}"/>
                                                     <Border Background="#22FFD700" CornerRadius="4" Padding="5,0" Margin="6,1,0,0" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding TypeLabel}" Foreground="#FFD700" FontSize="9" FontWeight="Bold"/>
+                                                        <TextBlock Text="{Binding TypeLabel}" Foreground="{DynamicResource AccentColor}" FontSize="9" FontWeight="Bold"/>
                                                     </Border>
                                                 </StackPanel>
                                                 <TextBlock Text="{Binding Description}" FontSize="10" Foreground="#AAA" TextTrimming="CharacterEllipsis"/>
@@ -576,6 +576,7 @@
                             </Grid>
                             <StackPanel x:Name="PanelDiscosExtras" Visibility="Collapsed">
                                 <RadioButton x:Name="BtnWinpeTools" GroupName="Menu" Tag="&#x1F6E0;&#xFE0F;" Content="WinPE Tools (shrink)" Style="{StaticResource NavSubButtonStyle}" Click="NavButton_Click" ToolTip="Shrink sem limitacoes e teste de boot pelo WinPE ramdisk"/>
+                                <RadioButton x:Name="BtnHopsShrink" GroupName="Menu" Tag="&#x1F9EA;" Content="HOPS Shrink (bancada)" Style="{StaticResource NavSubButtonStyle}" Click="NavButton_Click" ToolTip="Bancada independente para testar métodos HOPS de shrink em VMs"/>
                                 <!-- Fresh Install (preservar) NAO entra aqui (03/10/2026): a operacao
                                      NUNCA foi testada de ponta a ponta. Exposta na sidebar ela
                                      convida o usuario a clicar numa funcao que mexe em todo o
@@ -595,16 +596,16 @@
 
                     <!-- RODAP&#xC9; DO MENU (SOBRE + MONITOR) -->
                     <StackPanel Grid.Row="3">
-                        <Separator Background="{StaticResource CardBorder}" Margin="0,10" Opacity="0.5"/>
+                        <Separator Background="{DynamicResource CardBorder}" Margin="0,10" Opacity="0.5"/>
                         <RadioButton x:Name="BtnTray" GroupName="Menu" Tag="&#x1F514;" Content="&#x1F4E1; Monitor RAM (Tray)" 
                                      Style="{StaticResource NavButtonStyle}" 
-                                     Foreground="{StaticResource TextMuted}"
+                                     Foreground="{DynamicResource TextMuted}"
                                      Click="NavButton_Click"
                                      ToolTip="Configura&#xE7;&#xF5;es do &#xED;cone na bandeja e monitor de RAM"/>
                         <!-- BOT&#xC3;O GAMEBOOST PRO (ANTIGO SOBRE) -->
                         <RadioButton x:Name="BtnGameBoost" GroupName="Menu" Tag="&#x1F680;" Content="GameBoost Pro" 
                                      Style="{StaticResource NavButtonStyle}" 
-                                     Foreground="{StaticResource AccentColor}"
+                                     Foreground="{DynamicResource AccentColor}"
                                      Click="NavButton_Click"
                                      ToolTip="GameBoost Inteligente - Algoritmo ProBalance Style"/>
                         <!-- BOT&#xC3;O DIAGN&#xD3;STICO -->
@@ -623,7 +624,7 @@
             <!-- CONTE&#xDA;DO PRINCIPAL (DIREITA) -->
             <!-- ========================================================= -->
             <!-- &#x1F4CD; ANIMA&#xC7;&#xC3;O 5: Fade-in ao navegar entre p&#xE1;ginas (0.25s) - MainWindow.xaml linha ~357 -->
-            <Frame x:Name="MainFrame" Grid.Row="0" Grid.Column="1" NavigationUIVisibility="Hidden" Background="{StaticResource WindowBackground}" Margin="0,32,0,0" Panel.ZIndex="1" Navigated="MainFrame_Navigated">
+            <Frame x:Name="MainFrame" Grid.Row="0" Grid.Column="1" NavigationUIVisibility="Hidden" Background="{DynamicResource WindowBackground}" Margin="0,32,0,0" Panel.ZIndex="1" Navigated="MainFrame_Navigated">
                 <Frame.RenderTransform>
                     <ScaleTransform ScaleX="1" ScaleY="1" CenterX="0.5" CenterY="0.5"/>
                 </Frame.RenderTransform>
@@ -718,13 +719,13 @@
                         <TextBlock x:Name="BackgroundTaskPages"
                                    Text=""
                                    FontSize="9"
-                                   Foreground="#888888"
+                                   Foreground="{DynamicResource TextMuted}"
                                    Margin="0,1,0,0"/>
                         <!-- ⬇️ NOVO: Barra de progresso para tarefas com percentual reportado -->
                         <ProgressBar x:Name="BackgroundTaskProgressBar"
                                      Height="3"
                                      Margin="0,4,0,0"
-                                     Foreground="#FFD700"
+                                     Foreground="{DynamicResource AccentColor}"
                                      Background="#20FFFFFF"
                                      BorderThickness="0"
                                      Visibility="Collapsed"
@@ -738,7 +739,7 @@
                             Grid.Column="2"
                             Content="&#x2715;"
                             FontSize="11"
-                            Foreground="#888888"
+                            Foreground="{DynamicResource TextMuted}"
                             Background="Transparent"
                             BorderThickness="0"
                             Margin="5,0,8,0"
@@ -770,7 +771,7 @@
             <Border x:Name="BackgroundMonitorPanel" Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="2"
                     Panel.ZIndex="20000" Visibility="Collapsed"
                     Background="#88000000">
-                <Border Background="#DD1A1A1A" BorderBrush="{StaticResource AccentColor}" BorderThickness="2"
+                <Border Background="#DD1A1A1A" BorderBrush="{DynamicResource AccentColor}" BorderThickness="2"
                         CornerRadius="12" Width="650" MaxHeight="550"
                         HorizontalAlignment="Center" VerticalAlignment="Center"
                         Padding="20">
@@ -791,11 +792,11 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="&#x2699;&#xFE0F; Monitor de Tarefas em Segundo Plano" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
+                                <TextBlock Text="&#x2699;&#xFE0F; Monitor de Tarefas em Segundo Plano" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
                                 <TextBlock x:Name="MonitorSubtitle" Text="Nenhuma tarefa em execu&#xE7;&#xE3;o" FontSize="12" Foreground="#888" Margin="0,5,0,0"/>
                             </StackPanel>
                             <Button Grid.Column="1" Content="&#x2715;" Width="32" Height="32" Background="Transparent" BorderThickness="0"
-                                    Foreground="#FFD700" Cursor="Hand" Click="CloseBackgroundMonitor_Click">
+                                    Foreground="{DynamicResource AccentColor}" Cursor="Hand" Click="CloseBackgroundMonitor_Click">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="bdr" Background="{TemplateBinding Background}" CornerRadius="4">
@@ -873,7 +874,7 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </DataTemplate.Resources>
-                                        <Border CornerRadius="8" BorderThickness="1" BorderBrush="#333"
+                                        <Border CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource BorderSubtle}"
                                                 Padding="18,14" Margin="0,0,0,12">
                                             <Border.Style>
                                                 <Style TargetType="Border">
@@ -942,8 +943,8 @@
 
                         <!-- Rodap&#xE9; -->
                         <StackPanel Grid.Row="2" Margin="0,15,0,0">
-                            <Separator Background="#333" Margin="0,0,0,10"/>
-                            <Button Content="Limpar Hist&#xF3;rico" Height="35" Background="#333" Foreground="White"
+                            <Separator Background="{DynamicResource BorderSubtle}" Margin="0,0,0,10"/>
+                            <Button Content="Limpar Hist&#xF3;rico" Height="35" Background="{DynamicResource BorderSubtle}" Foreground="White"
                                     BorderThickness="0" Cursor="Hand" Click="ClearCompletedTasks_Click">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
@@ -980,11 +981,11 @@
             <!-- Modal Overlay (Di&#xE1;logos) -->
             <Grid x:Name="OverlayContainer" Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="2" 
                   Panel.ZIndex="10000" Visibility="Collapsed" Background="#CC000000">
-                <Border x:Name="OverlayConfirm" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" 
+                <Border x:Name="OverlayConfirm" Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentColor}" 
                         BorderThickness="1" CornerRadius="15" Width="450" VerticalAlignment="Center" HorizontalAlignment="Center" 
                         Padding="30" Visibility="Collapsed">
                     <StackPanel>
-                        <TextBlock Text="CONFIRMA&#xC7;&#xC3;O" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15" HorizontalAlignment="Center"/>
+                        <TextBlock Text="CONFIRMA&#xC7;&#xC3;O" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,15" HorizontalAlignment="Center"/>
                         <TextBlock x:Name="TxtConfirmMessage" Text="Deseja continuar?" Foreground="White" FontSize="14" Margin="0,0,0,30" TextAlignment="Center" TextWrapping="Wrap"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <Button Content="N&#xC3;O" Click="BtnConfirmNo_Click" Style="{StaticResource SecondaryButtonStyle}" Width="120" Height="40" Margin="0,0,15,0"/>

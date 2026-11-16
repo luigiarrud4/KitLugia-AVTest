@@ -9,7 +9,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ContextMenu">
-                    <Border Background="#0F0F0F" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="2" Padding="2">
+                    <Border Background="{DynamicResource Surface0}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="2" Padding="2">
                         <ItemsPresenter />
                     </Border>
                 </ControlTemplate>
@@ -30,14 +30,14 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
-                    <Border x:Name="Border" Background="#0F0F0F" BorderThickness="0" BorderBrush="Transparent" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                    <Border x:Name="Border" Background="{DynamicResource Surface0}" BorderThickness="0" BorderBrush="Transparent" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="24"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="CheckMark" Text="&#x2713;" Foreground="#FFD700" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                            <TextBlock x:Name="CheckMark" Text="&#x2713;" Foreground="{DynamicResource AccentColor}" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
                             <ContentPresenter x:Name="HeaderHost" ContentSource="Header" VerticalAlignment="Center" Grid.Column="1" Margin="8,0,0,0" RecognizesAccessKey="True" TextElement.Foreground="{TemplateBinding Foreground}"/>
                             <!-- SETA + POPUP do submenu: sem os dois o item com filhos aparecia como um
                                  comando comum e clicar nele NAO abria nada (o submenu ficava inacessivel). -->
@@ -46,7 +46,7 @@
                             <Popup x:Name="SubmenuHost" Placement="Right" VerticalOffset="-3" HorizontalOffset="-4"
                                    IsOpen="{TemplateBinding IsSubmenuOpen}" AllowsTransparency="True" Focusable="False"
                                    PopupAnimation="Fade">
-                                <Border Background="#0F0F0F" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="4" Padding="2">
+                                <Border Background="{DynamicResource Surface0}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="4" Padding="2">
                                     <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
                                 </Border>
                             </Popup>
@@ -122,7 +122,7 @@
                                        VerticalAlignment="Center" Margin="10,0,4,0" Visibility="Collapsed"/>
                             <Popup x:Name="SubmenuHost" Grid.Column="0" Placement="Right" VerticalOffset="-3" HorizontalOffset="-4"
                                    IsOpen="{TemplateBinding IsSubmenuOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
-                                <Border Background="#0F0F0F" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="4" Padding="2">
+                                <Border Background="{DynamicResource Surface0}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="4" Padding="2">
                                     <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
                                 </Border>
                             </Popup>

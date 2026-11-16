@@ -19,19 +19,19 @@
                         </BeginStoryboard>
                     </EventTrigger>
                 </Grid.Triggers>
-                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse Width="7" Height="7" Fill="{DynamicResource AccentColor}" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Ellipse.RenderTransform><TranslateTransform X="0" Y="-16"/></Ellipse.RenderTransform>
                 </Ellipse>
-                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse Width="7" Height="7" Fill="{DynamicResource AccentColor}" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Ellipse.RenderTransform><TranslateTransform X="15.2" Y="-4.9"/></Ellipse.RenderTransform>
                 </Ellipse>
-                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse Width="7" Height="7" Fill="{DynamicResource AccentColor}" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Ellipse.RenderTransform><TranslateTransform X="9.4" Y="12.9"/></Ellipse.RenderTransform>
                 </Ellipse>
-                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse Width="7" Height="7" Fill="{DynamicResource AccentColor}" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Ellipse.RenderTransform><TranslateTransform X="-9.4" Y="12.9"/></Ellipse.RenderTransform>
                 </Ellipse>
-                <Ellipse Width="7" Height="7" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse Width="7" Height="7" Fill="{DynamicResource AccentColor}" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Ellipse.RenderTransform><TranslateTransform X="-15.2" Y="-4.9"/></Ellipse.RenderTransform>
                 </Ellipse>
             </Grid>
@@ -52,19 +52,19 @@
                         </BeginStoryboard>
                     </EventTrigger>
                 </Grid.Triggers>
-                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse Width="4" Height="4" Fill="{DynamicResource AccentColor}" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Ellipse.RenderTransform><TranslateTransform X="0" Y="-9"/></Ellipse.RenderTransform>
                 </Ellipse>
-                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse Width="4" Height="4" Fill="{DynamicResource AccentColor}" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Ellipse.RenderTransform><TranslateTransform X="8.6" Y="-2.8"/></Ellipse.RenderTransform>
                 </Ellipse>
-                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse Width="4" Height="4" Fill="{DynamicResource AccentColor}" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Ellipse.RenderTransform><TranslateTransform X="5.3" Y="7.3"/></Ellipse.RenderTransform>
                 </Ellipse>
-                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse Width="4" Height="4" Fill="{DynamicResource AccentColor}" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Ellipse.RenderTransform><TranslateTransform X="-5.3" Y="7.3"/></Ellipse.RenderTransform>
                 </Ellipse>
-                <Ellipse Width="4" Height="4" Fill="#FFD700" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse Width="4" Height="4" Fill="{DynamicResource AccentColor}" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Ellipse.RenderTransform><TranslateTransform X="-8.6" Y="-2.8"/></Ellipse.RenderTransform>
                 </Ellipse>
             </Grid>

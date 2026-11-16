@@ -12,7 +12,7 @@
             HorizontalAlignment="Center" VerticalAlignment="Center"
             Margin="0,0,10,0"
             Focusable="False">
-        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{StaticResource AccentColor}"/>
+        <TextBlock Text="&#x2139;&#xFE0F;" FontSize="16" Foreground="{DynamicResource AccentColor}"/>
         <Button.Template>
             <ControlTemplate TargetType="Button">
                 <Border Background="Transparent">

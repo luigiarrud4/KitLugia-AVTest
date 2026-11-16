@@ -93,7 +93,7 @@
             <TextBlock Text="Entradas marcadas como &#x201C;Sistema&#x201D; são nativas do Windows ou de aplicativos instalados (HKLM). Entradas &#x201C;Usuário&#x201D; podem ser removidas com segurança." Foreground="{DynamicResource TextDescription}" FontSize="12" Margin="0,0,0,12"/>
 
             <!-- DataGrid -->
-            <Border BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111" Margin="0,0,0,20">
+            <Border BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111" Margin="0,0,0,20">
                 <DataGrid x:Name="GridEntries" SelectionMode="Single" AutoGenerateColumns="False" HeadersVisibility="Column" IsReadOnly="True"
                           BorderThickness="0" RowHeaderWidth="0" Background="Transparent"
                           GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#222">

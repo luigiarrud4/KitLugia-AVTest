@@ -10,7 +10,7 @@
                        FontSize="24" FontWeight="Bold" Foreground="#00FF88" Margin="0,0,0,20"/>
             
             <!-- STATUS GERAL -->
-            <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="20" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource Surface1}" CornerRadius="12" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="20" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <TextBlock Text="&#x1F4CA; STATUS GERAL" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
                     <Grid>
@@ -36,7 +36,7 @@
             </Border>
             
             <!-- CONTROLE DE M&#xD3;DULOS -->
-            <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="20" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource Surface1}" CornerRadius="12" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="20" Margin="0,0,0,20" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <TextBlock Text="&#x1F3AE; CONTROLE DE M&#xD3;DULOS (Clique para Desligar/Ligar)" 
                                FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
@@ -83,21 +83,21 @@
             </Border>
             
             <!-- LISTA DE TIMERS ATIVOS -->
-            <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="20" Margin="0,0,0,20">
+            <Border Background="{DynamicResource Surface1}" CornerRadius="12" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="20" Margin="0,0,0,20">
                 <StackPanel>
                     <TextBlock Text="&#x23F1;&#xFE0F; TIMERS ATIVOS" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
                     <ListBox x:Name="ListActiveTimers" Background="#0A0A0A" Foreground="#00FF88" 
-                             BorderBrush="#333" Height="150" FontFamily="Consolas" FontSize="12"/>
+                             BorderBrush="{DynamicResource BorderSubtle}" Height="150" FontFamily="Consolas" FontSize="12"/>
                 </StackPanel>
             </Border>
             
             <!-- LOG DE ALLOCA&#xC7;&#xC3;O -->
-            <Border Background="#1A1A1A" CornerRadius="12" BorderBrush="#333" BorderThickness="1" Padding="20" Margin="0,0,0,20">
+            <Border Background="{DynamicResource Surface1}" CornerRadius="12" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="20" Margin="0,0,0,20">
                 <StackPanel>
                     <TextBlock Text="&#x1F4DD; LOG DE ATIVIDADE (&#xDA;ltimos 30 segundos)" 
                                FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
                     <TextBox x:Name="TxtActivityLog" Background="#0A0A0A" Foreground="#00FF88" 
-                             BorderBrush="#333" Height="200" FontFamily="Consolas" FontSize="11" 
+                             BorderBrush="{DynamicResource BorderSubtle}" Height="200" FontFamily="Consolas" FontSize="11" 
                              IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
                 </StackPanel>
             </Border>

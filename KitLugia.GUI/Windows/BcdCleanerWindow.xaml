@@ -25,7 +25,7 @@
         </StackPanel>
 
         <!-- Lista de Entradas -->
-        <Border Grid.Row="1" BorderBrush="#3a3a3a" BorderThickness="1" Background="#252525" CornerRadius="8">
+        <Border Grid.Row="1" BorderBrush="#3a3a3a" BorderThickness="1" Background="{DynamicResource Surface2}" CornerRadius="8">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl x:Name="EntriesList">
                     <ItemsControl.ItemTemplate>
@@ -56,7 +56,7 @@
 
                                     <!-- Info -->
                                     <StackPanel Grid.Column="1">
-                                        <TextBlock x:Name="GuidText" Text="{Binding Guid}" FontSize="12" Foreground="#888888" Margin="0,0,0,5"/>
+                                        <TextBlock x:Name="GuidText" Text="{Binding Guid}" FontSize="12" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,5"/>
                                         <TextBlock x:Name="DescriptionText" Text="{Binding Description}" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,5"/>
                                         <TextBlock x:Name="ReasonText" Text="{Binding Reason}" FontSize="12" Foreground="#4ecdc4" Margin="0,0,0,5"/>
                                         <TextBlock x:Name="TypeText" Text="{Binding Type}" FontSize="11" Foreground="#aaaaaa"/>
@@ -72,11 +72,11 @@
         <!-- Bot&#xF5;es -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
             <Button x:Name="BtnSelectAll" Content="Selecionar Todas" Width="120" Height="35" Margin="0,0,10,0" 
-                    Background="#3a3a3a" Foreground="White" BorderBrush="#555" FontSize="13" Click="BtnSelectAll_Click"/>
+                    Background="#3a3a3a" Foreground="White" BorderBrush="{DynamicResource BorderStrong}" FontSize="13" Click="BtnSelectAll_Click"/>
             <Button x:Name="BtnDeselectAll" Content="Desmarcar Todas" Width="120" Height="35" Margin="0,0,10,0" 
-                    Background="#3a3a3a" Foreground="White" BorderBrush="#555" FontSize="13" Click="BtnDeselectAll_Click"/>
+                    Background="#3a3a3a" Foreground="White" BorderBrush="{DynamicResource BorderStrong}" FontSize="13" Click="BtnDeselectAll_Click"/>
             <Button x:Name="BtnCancel" Content="Cancelar" Width="100" Height="35" Margin="0,0,10,0" 
-                    Background="#3a3a3a" Foreground="White" BorderBrush="#555" FontSize="13" Click="BtnCancel_Click"/>
+                    Background="#3a3a3a" Foreground="White" BorderBrush="{DynamicResource BorderStrong}" FontSize="13" Click="BtnCancel_Click"/>
             <Button x:Name="BtnRemove" Content="&#x1F5D1;&#xFE0F; Remover Selecionadas" Width="160" Height="35" 
                     Background="#e74c3c" Foreground="White" BorderBrush="Transparent" FontSize="13" FontWeight="SemiBold" Click="BtnRemove_Click"/>
         </StackPanel>

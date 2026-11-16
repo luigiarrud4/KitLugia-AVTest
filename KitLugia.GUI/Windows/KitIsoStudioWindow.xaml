@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji"
         TextElement.Foreground="White"
-        Background="#0F0F0F"
+        Background="{DynamicResource Surface0}"
         ShowInTaskbar="False"
         TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="ClearType"
@@ -76,7 +76,7 @@
         </Style>
     </Window.Resources>
 
-    <Border BorderBrush="#FFD700" BorderThickness="1" CornerRadius="0">
+    <Border BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="0">
         <Grid Margin="14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -93,20 +93,20 @@
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="🧬" FontSize="22" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <TextBlock Text="KIT ISO STUDIO" FontSize="18" FontWeight="ExtraBold" Foreground="#FFD700" VerticalAlignment="Center" TextOptions.TextFormattingMode="Display"/>
-                        <Border Background="#FFD700" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="KIT ISO STUDIO" FontSize="18" FontWeight="ExtraBold" Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center" TextOptions.TextFormattingMode="Display"/>
+                        <Border Background="{DynamicResource AccentColor}" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
                             <TextBlock Text="EXPANSOR" FontSize="9" FontWeight="Bold" Foreground="Black" TextOptions.TextFormattingMode="Display"/>
                         </Border>
-                        <Border Background="#1A1A1A" CornerRadius="4" BorderBrush="#333" BorderThickness="1" Padding="8,3" Margin="10,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="⚡ wimlib + pnputil + oscdimg — nativo, sem DISM" FontSize="10" Foreground="#4CAF50" FontWeight="SemiBold"/>
+                        <Border Background="{DynamicResource Surface1}" CornerRadius="4" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="8,3" Margin="10,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="⚡ wimlib + pnputil + oscdimg — nativo, sem DISM" FontSize="10" Foreground="{DynamicResource SuccessBrush}" FontWeight="SemiBold"/>
                         </Border>
                     </StackPanel>
                     <TextBlock Text="Expansor integrado — foge do estilo do kit para caber dezenas de personalizações reais da ISO. Encha com o máximo de configurações." FontSize="11" Foreground="#CCCCCC" Margin="0,6,0,0" TextWrapping="Wrap" LineHeight="15"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="↔" Width="32" Height="32" Click="BtnToggleMaximize_Click" Background="#2A2A2A" Foreground="#AAA" BorderBrush="#333" BorderThickness="1" Cursor="Hand" FontSize="12" Margin="0,0,8,0" ToolTip="Esticar/Restaurar janela (como Spy)"/>
-                    <TextBlock Text="ⓘ" FontSize="16" Foreground="#FFD700" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Use abas para organizar. Tudo roda offline via wimlib (sem montar) + pnputil + registry offline. Rápido como PathManager."/>
-                    <Button Content="✕" Width="32" Height="32" Click="BtnClose_Click" Background="#1A1A1A" Foreground="White" BorderBrush="#333" BorderThickness="1" Cursor="Hand" FontSize="14" ToolTip="Fechar">
+                    <Button Content="↔" Width="32" Height="32" Click="BtnToggleMaximize_Click" Background="#2A2A2A" Foreground="#AAA" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Cursor="Hand" FontSize="12" Margin="0,0,8,0" ToolTip="Esticar/Restaurar janela (como Spy)"/>
+                    <TextBlock Text="ⓘ" FontSize="16" Foreground="{DynamicResource AccentColor}" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Use abas para organizar. Tudo roda offline via wimlib (sem montar) + pnputil + registry offline. Rápido como PathManager."/>
+                    <Button Content="✕" Width="32" Height="32" Click="BtnClose_Click" Background="{DynamicResource Surface1}" Foreground="White" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Cursor="Hand" FontSize="14" ToolTip="Fechar">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bdr" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
@@ -230,7 +230,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="TxtDriverFolder" IsReadOnly="True" Text="Nenhuma pasta selecionada" Background="#0A0A0A" Foreground="#888" BorderBrush="#2A2A2A" Padding="8" Height="30" VerticalContentAlignment="Center"/>
-                                        <Button Grid.Column="1" Content="📁" Width="36" Height="30" Margin="6,0,0,0" Click="BtnPickDriverFolder_Click" Background="#1A1A1A" BorderBrush="#FFD700" Foreground="#FFD700"/>
+                                        <Button Grid.Column="1" Content="📁" Width="36" Height="30" Margin="6,0,0,0" Click="BtnPickDriverFolder_Click" Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource AccentColor}" Foreground="{DynamicResource AccentColor}"/>
                                     </Grid>
                                     <CheckBox x:Name="ChkInjectDrivers" Content="Injetar drivers desta pasta na ISO" Margin="0,10,0,0" Foreground="White" FontSize="11.5"/>
                                     <CheckBox Content="Forçar boot duplo BIOS+UEFI (oscdimg -m -o -u2)" IsChecked="True" Margin="0,6,0,0" Foreground="White" FontSize="11.5"/>
@@ -355,15 +355,15 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Margin="0,0,6,0">
-                                            <TextBlock Text="✓ wimlib-imagex" Foreground="#4CAF50" FontWeight="Bold" FontSize="11"/>
+                                            <TextBlock Text="✓ wimlib-imagex" Foreground="{DynamicResource SuccessBrush}" FontWeight="Bold" FontSize="11"/>
                                             <TextBlock Text="dir / export / update delete --recursive / extract --dest-dir / optimize (sem --compress). Tudo sem montar, sem DISM." Foreground="#888" FontSize="10" TextWrapping="Wrap"/>
-                                            <TextBlock Text="✓ oscdimg" Foreground="#4CAF50" FontWeight="Bold" FontSize="11" Margin="0,6,0,0"/>
+                                            <TextBlock Text="✓ oscdimg" Foreground="{DynamicResource SuccessBrush}" FontWeight="Bold" FontSize="11" Margin="0,6,0,0"/>
                                             <TextBlock Text="Cria ISO bootável BIOS+UEFI dual (-m -o -u2 -udfver102) em 11s para 7GB." Foreground="#888" FontSize="10" TextWrapping="Wrap"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                                            <TextBlock Text="✓ pnputil + registry offline" Foreground="#4CAF50" FontWeight="Bold" FontSize="11"/>
+                                            <TextBlock Text="✓ pnputil + registry offline" Foreground="{DynamicResource SuccessBrush}" FontWeight="Bold" FontSize="11"/>
                                             <TextBlock Text="pnputil /export-driver + reg load HKLM\z... (SYSTEM/SOFTWARE/DEFAULT/NTUSER) + wimlib re-inject. 1-2s por hive." Foreground="#888" FontSize="10" TextWrapping="Wrap"/>
-                                            <TextBlock Text="✓ IOCTL nativo" Foreground="#4CAF50" FontWeight="Bold" FontSize="11" Margin="0,6,0,0"/>
+                                            <TextBlock Text="✓ IOCTL nativo" Foreground="{DynamicResource SuccessBrush}" FontWeight="Bold" FontSize="11" Margin="0,6,0,0"/>
                                             <TextBlock Text="GetDisks via IOCTL 0x70050 em 18ms vs WMI 340ms. Usado no WinBoot." Foreground="#888" FontSize="10" TextWrapping="Wrap"/>
                                         </StackPanel>
                                     </Grid>
@@ -395,12 +395,12 @@
             </TabControl>
 
             <!-- Footer -->
-            <Border Grid.Row="2" Background="#0F0F0F" CornerRadius="8" Padding="12" Margin="0,10,0,0" BorderBrush="#2A2A2A" BorderThickness="1">
+            <Border Grid.Row="2" Background="{DynamicResource Surface0}" CornerRadius="8" Padding="12" Margin="0,10,0,0" BorderBrush="#2A2A2A" BorderThickness="1">
                 <Grid>
                     <TextBlock Text="💡 Dica: este expansor cabe muito mais — use as abas. Tudo sincroniza com o painel padrão antes de INICIAR CRIAÇÃO e roda 100% nativo." FontSize="11" Foreground="#CCCCCC" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,0" MaxWidth="560" LineHeight="15" TextOptions.TextFormattingMode="Display"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button Content="FECHAR" Width="110" Height="36" Click="BtnClose_Click" Background="#1A1A1A" Foreground="White" BorderBrush="#333" BorderThickness="1" Cursor="Hand"/>
-                        <Button Content="✅ APLICAR E FECHAR" Width="170" Height="36" Click="BtnApply_Click" Background="#FFD700" Foreground="Black" FontWeight="Bold" BorderThickness="0" Cursor="Hand" Margin="8,0,0,0"/>
+                        <Button Content="FECHAR" Width="110" Height="36" Click="BtnClose_Click" Background="{DynamicResource Surface1}" Foreground="White" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Cursor="Hand"/>
+                        <Button Content="✅ APLICAR E FECHAR" Width="170" Height="36" Click="BtnApply_Click" Background="{DynamicResource AccentColor}" Foreground="Black" FontWeight="Bold" BorderThickness="0" Cursor="Hand" Margin="8,0,0,0"/>
                     </StackPanel>
                 </Grid>
             </Border>

@@ -1,0 +1,17 @@
+﻿<UserControl x:Class="KitLugia.GUI.Controls.AreaLoadingOverlay"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Variante A do contrato (docs/UI_PROGRESS.md): scrim #CC000000 raio 8
+         + Win11SpinnerTemplate + mensagem branca 16 + linha de progresso #FFD700 12 opcional. -->
+    <Border Background="#CC000000" CornerRadius="8">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+            <ContentControl x:Name="SpinnerHost" Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="MessageText" Text="" Foreground="White" FontSize="16" Margin="0,15,0,0"/>
+            <TextBlock x:Name="SubtitleText" Foreground="{DynamicResource TextDescription}" FontSize="12" Margin="0,6,0,0"
+                       HorizontalAlignment="Center" Visibility="Collapsed"/>
+            <TextBlock x:Name="ProgressText" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,5,0,0"
+                       HorizontalAlignment="Center" Visibility="Collapsed"/>
+        </StackPanel>
+    </Border>
+</UserControl>

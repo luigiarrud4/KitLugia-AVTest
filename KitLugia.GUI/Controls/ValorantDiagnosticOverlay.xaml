@@ -8,9 +8,9 @@
              d:DesignHeight="700" d:DesignWidth="1000">
     
     <Grid Background="#CC000000">
-        <Border Background="#1A1A1A" 
+        <Border Background="{DynamicResource Surface1}" 
                 CornerRadius="16" 
-                BorderBrush="#FFD700" 
+                BorderBrush="{DynamicResource AccentColor}" 
                 BorderThickness="2"
                 Width="650"
                 MaxHeight="550"
@@ -20,12 +20,12 @@
             <Grid>
                 <!-- Header com X para fechar -->
                 <Grid Height="60" VerticalAlignment="Top">
-                    <Border Background="#252525" CornerRadius="16,16,0,0">
+                    <Border Background="{DynamicResource Surface2}" CornerRadius="16,16,0,0">
                         <Grid Margin="20,0,20,0">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="&#x1F3AE;" FontSize="28" Margin="0,0,15,0" VerticalAlignment="Center"/>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="DIAGN&#xD3;STICO VALORANT" FontSize="20" FontWeight="ExtraBold" Foreground="#FFD700"/>
+                                    <TextBlock Text="DIAGN&#xD3;STICO VALORANT" FontSize="20" FontWeight="ExtraBold" Foreground="{DynamicResource AccentColor}"/>
                                     <TextBlock Text="Verifica&#xE7;&#xE3;o UEFI, TPM 2.0 e VBS/HVCI (VAN9005)" FontSize="12" Foreground="#AAA" Opacity="0.8"/>
                                 </StackPanel>
                             </StackPanel>
@@ -77,7 +77,7 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- UEFI -->
-                            <Border Grid.Row="0" Grid.Column="0" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,12,12">
+                            <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,12,12">
                                 <StackPanel>
                                     <TextBlock Text="&#x2699;&#xFE0F;" FontSize="32" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                                     <TextBlock Text="Modo UEFI" Foreground="White" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
@@ -86,7 +86,7 @@
                             </Border>
 
                             <!-- TPM 2.0 -->
-                            <Border Grid.Row="0" Grid.Column="1" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,12">
+                            <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,12">
                                 <StackPanel>
                                     <TextBlock Text="&#x1F510;" FontSize="32" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                                     <TextBlock Text="TPM 2.0" Foreground="White" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
@@ -95,7 +95,7 @@
                             </Border>
 
                             <!-- VBS -->
-                            <Border Grid.Row="1" Grid.Column="0" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,12,0">
+                            <Border Grid.Row="1" Grid.Column="0" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,12,0">
                                 <StackPanel>
                                     <TextBlock Text="&#x1F6E1;&#xFE0F;" FontSize="32" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                                     <TextBlock Text="VBS" Foreground="White" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
@@ -104,7 +104,7 @@
                             </Border>
 
                             <!-- HVCI -->
-                            <Border Grid.Row="1" Grid.Column="1" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,0">
+                            <Border Grid.Row="1" Grid.Column="1" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,0">
                                 <StackPanel>
                                     <TextBlock Text="&#x26A1;" FontSize="32" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                                     <TextBlock Text="HVCI" Foreground="White" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
@@ -114,7 +114,7 @@
                         </Grid>
 
                         <!-- Overall Status -->
-                        <Border x:Name="BorderValorantStatus" Background="#333" CornerRadius="10" Padding="18" Margin="0,15,0,0">
+                        <Border x:Name="BorderValorantStatus" Background="{DynamicResource BorderSubtle}" CornerRadius="10" Padding="18" Margin="0,15,0,0">
                             <TextBlock x:Name="TxtValorantOverallStatus" Text="Aguardando verifica&#xE7;&#xE3;o..."
                                        TextWrapping="Wrap" Foreground="White" FontSize="12" LineHeight="20"/>
                         </Border>
@@ -122,7 +122,7 @@
                         <!-- Buttons -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
                             <Button x:Name="BtnApplyValorantRepair" Content="Aplicar Reparo"
-                                    Background="#FFD700" Foreground="#1E1E1E" BorderThickness="0"
+                                    Background="{DynamicResource AccentColor}" Foreground="#1E1E1E" BorderThickness="0"
                                     Padding="28,12" FontSize="13" FontWeight="Bold" Cursor="Hand"
                                     Click="BtnApplyValorantRepair_Click" IsEnabled="False">
                                 <Button.Style>

@@ -42,7 +42,7 @@
             </Border>
 
             <TextBlock Grid.Column="1" x:Name="TxtCount" Text="0 tweaks" FontSize="12" 
-                       Foreground="{StaticResource AccentColor}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                       Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center" FontWeight="SemiBold"/>
 
             <ComboBox x:Name="CmbCategory" Grid.Column="3" Height="32" SelectedIndex="0"
                       SelectionChanged="CmbCategory_SelectionChanged">
@@ -99,7 +99,7 @@
 
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Border Background="#1A1A1A" BorderBrush="#2A2A2A" BorderThickness="1" 
+                        <Border Background="{DynamicResource Surface1}" BorderBrush="#2A2A2A" BorderThickness="1" 
                                 CornerRadius="6" Padding="12,10" Margin="0,0,0,6"
                                 Tag="{Binding Category}">
                             <Grid>

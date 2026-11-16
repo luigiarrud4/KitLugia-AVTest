@@ -8,84 +8,9 @@
       Title="Fresh Install + Preservação">
 
     <Page.Resources>
-        <ControlTemplate x:Key="GameBoostComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="36" />
-                </Grid.ColumnDefinitions>
-                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="5" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
-                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L5,5 L10,0" IsHitTestVisible="False"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Border" Property="Background" Value="#2A2A2A" />
-                    <Setter TargetName="Border" Property="BorderBrush" Value="#666666" />
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
 
-        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#222222"/>
-            <Setter Property="BorderBrush" Value="#444444"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Setter Property="OverridesDefaultStyle" Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ComboBox}">
-                        <Grid>
-                            <ToggleButton Name="ToggleButton" Template="{StaticResource GameBoostComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Cursor="Hand"/>
-                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
-                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide" StaysOpen="False">
-                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="#222222" BorderThickness="1" BorderBrush="#444444" CornerRadius="5"/>
-                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                    </ScrollViewer>
-                                </Grid>
-                            </Popup>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="StepCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="#1A1A1A"/>
-            <Setter Property="BorderBrush" Value="#333"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="15"/>
-        </Style>
-        <Style x:Key="GreenButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#1A4A1A"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#33D4AF37"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#226622"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#0D330D"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.3"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+        <!-- StepCardStyle e GreenButtonStyle agora vem do tema (Themes/Cards.xaml e
+             Themes/Buttons.xaml); WarningBoxStyle segue local (sem equivalente no tema). -->
         <Style x:Key="WarningBoxStyle" TargetType="Border">
             <Setter Property="Background" Value="#1A331100"/>
             <Setter Property="BorderBrush" Value="#55FFAA00"/>
@@ -109,8 +34,8 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="Fresh Install + Preservação de Dados" FontSize="24" FontWeight="ExtraBold" Foreground="{StaticResource AccentColor}"/>
-                <TextBlock Text="Instale um Windows novo sem perder seus arquivos, programas e configurações" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,2,0,0"/>
+                <TextBlock Text="Fresh Install + Preservação de Dados" FontSize="24" FontWeight="ExtraBold" Foreground="{DynamicResource AccentColor}"/>
+                <TextBlock Text="Instale um Windows novo sem perder seus arquivos, programas e configurações" Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="0,2,0,0"/>
             </StackPanel>
             <Button Grid.Column="1" Content="Voltar" Click="BtnBack_Click" Style="{StaticResource SecondaryButtonStyle}" Width="80" Height="32" FontSize="11" VerticalAlignment="Center"/>
         </Grid>
@@ -135,7 +60,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="1. PREPARAR WINPE" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="WinPE pronto para boot — necessário para mover dados e instalar o Windows offline." Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                <TextBlock Text="WinPE pronto para boot — necessário para mover dados e instalar o Windows offline." Foreground="{DynamicResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Border x:Name="BdrWinpeStatus" Background="#222233" BorderBrush="#4488FF" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="0,0,10,0">
@@ -158,7 +83,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock Text="2. SELECIONAR ISO DO WINDOWS" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock x:Name="TxtIsoPath" Text="Nenhum ISO carregado" Foreground="{StaticResource TextMuted}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                <TextBlock x:Name="TxtIsoPath" Text="Nenhum ISO carregado" Foreground="{DynamicResource TextMuted}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
                             </StackPanel>
                             <Button Grid.Column="1" x:Name="BtnLoadIso" Content="CARREGAR ISO" Click="BtnLoadIso_Click"
                                     Style="{StaticResource SecondaryButtonStyle}" Height="36" FontSize="11" Width="140"/>
@@ -169,7 +94,7 @@
                     <Border Style="{StaticResource StepCardStyle}" Margin="0,0,0,10">
                         <StackPanel>
                             <TextBlock Text="3. CONFIGURAR OPERAÇÃO" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
-                            <TextBlock Text="Selecione o que preservar:" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,6"/>
+                            <TextBlock Text="Selecione o que preservar:" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,6"/>
 
                             <!-- Options -->
                             <Border Style="{StaticResource WarningBoxStyle}" Margin="0,0,0,10">
@@ -188,26 +113,26 @@
                             </Border>
 
                             <!-- ISO Edition selector (appears after ISO is loaded) -->
-                            <Border x:Name="PanelEdition" Background="#111" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10" Visibility="Collapsed">
+                            <Border x:Name="PanelEdition" Background="#111" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10" Visibility="Collapsed">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Edição:" FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                    <ComboBox x:Name="CboEdition" Grid.Column="1" Style="{StaticResource DarkComboBoxStyle}" FontSize="12" Height="30"/>
+                                    <TextBlock Text="Edição:" FontSize="12" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <ComboBox x:Name="CboEdition" Grid.Column="1" FontSize="12" Height="30"/>
                                 </Grid>
                             </Border>
 
-                            <Border Background="#1A1A1A" BorderBrush="#444" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                            <Border Background="{DynamicResource Surface1}" BorderBrush="#444" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Partição alvo:" FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                    <ComboBox x:Name="CboTargetDrive" Grid.Column="1" Style="{StaticResource DarkComboBoxStyle}" FontSize="12" Height="30"/>
+                                    <TextBlock Text="Partição alvo:" FontSize="12" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <ComboBox x:Name="CboTargetDrive" Grid.Column="1" FontSize="12" Height="30"/>
                                     <Button x:Name="BtnRefreshDisks" Grid.Column="2" Content="ATUALIZAR" Click="BtnRefreshDisks_Click"
                                             Style="{StaticResource SecondaryButtonStyle}" Height="30" FontSize="11" Width="90" Margin="10,0,0,0"/>
                                 </Grid>
@@ -231,7 +156,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="4. INICIAR" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock x:Name="TxtReadyStatus" Text="Carregue um ISO e selecione as opções acima." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                                <TextBlock x:Name="TxtReadyStatus" Text="Carregue um ISO e selecione as opções acima." Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                             </StackPanel>
                             <Button x:Name="BtnStart" Grid.Column="1" Content="INICIAR FRESH INSTALL"
                                     Click="BtnStart_Click"
@@ -251,7 +176,7 @@
                             <StackPanel Grid.Row="0" Orientation="Horizontal">
                                 <StackPanel>
                                     <TextBlock Text="LOG DA OPERAÇÃO" FontSize="13" FontWeight="Bold" Foreground="White"/>
-                                    <TextBlock Text="Resultados da última execução (WinPE persistente)." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                                    <TextBlock Text="Resultados da última execução (WinPE persistente)." Foreground="{DynamicResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                                 </StackPanel>
                                 <Button x:Name="BtnRefreshLog" Content="ATUALIZAR LOG" Click="BtnRefreshLog_Click"
                                         Margin="12,0,0,0" VerticalAlignment="Top" Padding="10,4" FontSize="11"
@@ -271,42 +196,42 @@
             <Border Grid.Column="1" Style="{StaticResource SubtleCardStyle}" Padding="15">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <TextBlock Text="Como funciona" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,12"/>
+                        <TextBlock Text="Como funciona" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,12"/>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 1 — Preparar WinPE</Run>
                             <LineBreak/>
                             Baixa e configura o ambiente WinPE offline.
                         </TextBlock>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 2 — Carregar ISO</Run>
                             <LineBreak/>
                             Selecione o ISO do Windows que será instalado.
                         </TextBlock>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 3 — Detectar Partição</Run>
                             <LineBreak/>
                             Disco/partição alvo e ESP são resolvidos pela Storage API
                             (sem depender de letra fixa).
                         </TextBlock>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 4 — Aplicar Imagem Direto</Run>
                             <LineBreak/>
                             WinPE monta o alvo como Z:, faz backup na própria
                             partição e aplica o Windows novo via wimlib/DISM.
                         </TextBlock>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 5 — Merge Registry</Run>
                             <LineBreak/>
                             Se ativado, mescla o registry antigo com o novo
                             para preservar programas instalados.
                         </TextBlock>
 
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
                             <Run FontWeight="Bold" Foreground="White">Passo 6 — Restaurar + Reboot</Run>
                             <LineBreak/>
                             Dados são devolvidos e o PC reinicia no Windows novo
@@ -315,8 +240,8 @@
 
                         <Separator Background="#222" Margin="0,0,0,8"/>
 
-                        <TextBlock Text="Estratégias" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" FontSize="11" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4">
+                        <TextBlock Text="Estratégias" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" FontSize="11" Margin="0,0,0,6"/>
+                        <TextBlock Foreground="{DynamicResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4">
                             <Run FontWeight="Bold" Foreground="#88FF88">A — Segura:</Run> Users, dados, drivers.
                             <LineBreak/>
                             <Run FontWeight="Bold" Foreground="#FFAA44">B — Registry HKCU:</Run> Personalização, WiFi, bookmarks.
@@ -335,7 +260,7 @@
 
         <!-- BUSY OVERLAY -->
         <Grid x:Name="OverlayBusy" Grid.RowSpan="3" Background="#EE000000" Visibility="Collapsed" Margin="-25,-20,-25,-15">
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="15"
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="15"
                     Width="650" MaxHeight="500" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -343,12 +268,12 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" x:Name="TxtOpTitle" Text="EXECUTANDO" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10" HorizontalAlignment="Center"/>
+                    <TextBlock Grid.Row="0" x:Name="TxtOpTitle" Text="EXECUTANDO" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,10" HorizontalAlignment="Center"/>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" MaxHeight="320" Margin="0,0,0,12">
                         <StackPanel>
                             <TextBlock x:Name="TxtOpDesc" Text="Aguarde..." Foreground="White" FontSize="12" FontFamily="Consolas" Margin="0,0,0,12" TextWrapping="Wrap"/>
-                            <ProgressBar x:Name="ProgOp" IsIndeterminate="True" Height="6" Foreground="{StaticResource AccentColor}" Background="#1A1A1A" BorderThickness="0" Margin="0,0,0,10"/>
-                            <TextBlock x:Name="TxtOpStatus" Text="Processando..." Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap"/>
+                            <ProgressBar x:Name="ProgOp" IsIndeterminate="True" Height="6" Foreground="{DynamicResource AccentColor}" Background="{DynamicResource Surface1}" BorderThickness="0" Margin="0,0,0,10"/>
+                            <TextBlock x:Name="TxtOpStatus" Text="Processando..." Foreground="{DynamicResource TextMuted}" FontSize="11" TextWrapping="Wrap"/>
                             <Border Background="#22FF3D00" BorderBrush="#88FF3D00" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,10,0,0">
                                 <TextBlock Text="AÇÃO CRÍTICA: NÃO FECHE O APP OU DESLIGUE O PC AGORA!" Foreground="#FFFF3D00" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
                             </Border>
@@ -363,7 +288,7 @@
 
         <!-- CONFIRM OVERLAY -->
         <Grid x:Name="OverlayConfirm" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed" Margin="-25,-20,-25,-15">
-            <Border Background="{StaticResource CardBackground}" BorderBrush="#FFAA00" BorderThickness="1" CornerRadius="15"
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="#FFAA00" BorderThickness="1" CornerRadius="15"
                     Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="25">
                 <StackPanel>
                     <TextBlock Text="⚠️ CONFIRMAR OPERAÇÃO" FontSize="18" FontWeight="Bold" Foreground="#FFAA44" Margin="0,0,0,8"/>

@@ -7,7 +7,7 @@
       xmlns:converters="clr-namespace:KitLugia.GUI.Converters"
       mc:Ignorable="d" 
       Title="Integridade do Sistema"
-      Background="{StaticResource WindowBackground}"
+      Background="{DynamicResource WindowBackground}"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
     <Page.Resources>
@@ -67,12 +67,12 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="TxtPendingBanner" Grid.Column="0" FontSize="11"
-                               Foreground="#FFD700" TextWrapping="Wrap" Margin="0,0,10,0"/>
+                               Foreground="{DynamicResource AccentColor}" TextWrapping="Wrap" Margin="0,0,10,0"/>
                                     </Grid>
             </Border>
 
             <Border x:Name="ProgressBarContainer" Visibility="Collapsed" Margin="0,0,0,10" Height="4" CornerRadius="2" Background="#222">
-                <Border x:Name="ProgressBarFill" Width="100" Height="4" CornerRadius="2" Background="{StaticResource AccentColor}" HorizontalAlignment="Left"/>
+                <Border x:Name="ProgressBarFill" Width="100" Height="4" CornerRadius="2" Background="{DynamicResource AccentColor}" HorizontalAlignment="Left"/>
             </Border>
         </StackPanel>
         <!-- 2. BOTÕES E PESQUISA -->
@@ -85,12 +85,12 @@
             </Grid.ColumnDefinitions>
 
             <Button x:Name="BtnFixAll" Content="🛡️ RESTAURAR TODOS (PADRÃO SEGURO)" Click="BtnFixAll_Click"
-                    Width="280" Height="40" Background="#C42B1C" Foreground="White" FontWeight="Bold"
+                    Width="280" Height="40" Background="{DynamicResource ErrorBrush}" Foreground="White" FontWeight="Bold"
                     BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Style="{StaticResource GoldButtonStyle}"
                     ToolTip="Corrige apenas os itens MODIFICADOS (vulnerabilidades reais). Itens OPCIONAIS são mantidos como estão — eles são escolha sua e não contam para o score."/>
 
             <!-- SEARCH BOX (LUPA) -->
-            <Border Grid.Column="1" Height="36" Margin="15,0,15,0" CornerRadius="18" Background="#1A1A1A" BorderBrush="#333" BorderThickness="1">
+            <Border Grid.Column="1" Height="36" Margin="15,0,15,0" CornerRadius="18" Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -111,7 +111,7 @@
             </Border>
 
             <!-- CATEGORY FILTER COMBO -->
-            <Border Grid.Column="2" Height="36" CornerRadius="18" Background="#1A1A1A" BorderBrush="#333" BorderThickness="1" Margin="0,0,10,0">
+            <Border Grid.Column="2" Height="36" CornerRadius="18" Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Margin="0,0,10,0">
                 <ComboBox x:Name="CategoryFilter" VerticalAlignment="Center" Width="160"
                           Background="Transparent" Foreground="White" BorderThickness="0"
                           FontSize="12" SelectionChanged="CategoryFilter_SelectionChanged"
@@ -130,7 +130,7 @@
         </Grid>
 
         <!-- 2.5 CARD ÚNICO DE PATH (sistema + usuário) — substitui os vários botões PATH na lista -->
-        <Border Grid.Row="3" Margin="0,0,0,12" Background="#111111" BorderBrush="#333333" BorderThickness="1" CornerRadius="8" Padding="15,12">
+        <Border Grid.Row="3" Margin="0,0,0,12" Background="#111111" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="15,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -145,18 +145,18 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="PATH do Sistema e do Usuário" Foreground="White" FontWeight="SemiBold" FontSize="16" VerticalAlignment="Center"/>
                         <Border x:Name="PathStatusBadge" CornerRadius="4" Padding="8,3" Margin="10,0,0,0" Background="#154CAF50" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtPathStatus" Text="✅ OK" FontSize="11" FontWeight="Bold" Foreground="#4CAF50"/>
+                            <TextBlock x:Name="TxtPathStatus" Text="✅ OK" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}"/>
                         </Border>
                     </StackPanel>
                     <TextBlock x:Name="TxtPathDetail" Text="Um clique corrige TUDO de uma vez: entradas duplicadas, pastas inexistentes, essenciais do Windows e programas instalados fora do PATH (winget, git, node, dotnet, npm, 7-Zip, cargo...)."
-                               Foreground="#A0A0A0" FontSize="12" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                               Foreground="{DynamicResource TextDescription}" FontSize="12" Margin="0,3,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
 
                 <!-- Explorador (+) detalhado: ver entradas e adicionar manualmente -->
                 <Button Grid.Column="2" Click="BtnPathExplore_Click" Width="34" Height="34" Margin="0,0,10,0"
                         Background="Transparent" BorderThickness="0" Cursor="Hand"
                         ToolTip="Ver o PATH atual, o que está certo/errado e adicionar caminhos manualmente">
-                    <TextBlock Text="➕" FontSize="16" Foreground="#FFD700" Opacity="0.85"/>
+                    <TextBlock Text="➕" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.85"/>
                 </Button>
 
                 <!-- Botão único: repara System + User e adiciona os ausentes.
@@ -189,7 +189,7 @@
         <!-- ListBox tem ScrollViewer próprio + UI virtualização nativa. O padrão anterior
              (ItemsControl dentro de ScrollViewer) desligava a virtualização: TODOS os itens
              eram materializados de uma vez, congelando a página em listas grandes. -->
-        <Border Grid.Row="4" Background="#111111" BorderBrush="#333333" BorderThickness="1" CornerRadius="8">
+        <Border Grid.Row="4" Background="#111111" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="8">
           <Grid>
             <!-- Fundo escuro global: o template default do ListBox/ScrollViewer usa fundo
                  BRANCO do sistema. Enquanto a lista materializa (UI thread ocupada setando
@@ -277,7 +277,7 @@
                                                 CornerRadius="3" Padding="6,2"
                                                 Background="#33FFB900" BorderBrush="#FFB900" BorderThickness="1"
                                                 ToolTip="Este item já foi corrigido, mas a mudança só vale após reiniciar o Windows.">
-                                            <TextBlock Text="🔄 REINICIALIZAÇÃO PENDENTE" Foreground="#FFD700" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="🔄 REINICIALIZAÇÃO PENDENTE" Foreground="{DynamicResource AccentColor}" FontSize="11" FontWeight="Bold"/>
                                         </Border>
                                     </Grid>
                                     <TextBlock Text="{Binding Category}" Foreground="#666" FontSize="11"/>
@@ -291,7 +291,7 @@
                                             Width="30" Height="30" Cursor="Help"
                                             ToolTip="{Binding Converter={StaticResource TweakDescriptionTooltip}}"
                                             ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="20000" Template="{StaticResource IconButtonTemplate}">
-                                        <TextBlock Text="ℹ️" FontSize="16" Foreground="{StaticResource AccentColor}" Opacity="0.6"/>
+                                        <TextBlock Text="ℹ️" FontSize="16" Foreground="{DynamicResource AccentColor}" Opacity="0.6"/>
                                         
                                     </Button>
 
@@ -299,7 +299,7 @@
                                             Background="Transparent" BorderThickness="0" Visibility="Collapsed"
                                             Width="30" Height="30" Cursor="Hand"
                                             ToolTip="Ver o PATH atual, o que falta e adicionar caminhos ausentes" Template="{StaticResource IconButtonTemplate}">
-                                        <TextBlock Text="➕" FontSize="13" Foreground="#FFD700" Opacity="0.75"/>
+                                        <TextBlock Text="➕" FontSize="13" Foreground="{DynamicResource AccentColor}" Opacity="0.75"/>
                                         
                                     </Button>
                                 </StackPanel>
@@ -365,8 +365,8 @@
                                             <Condition Binding="{Binding IsOptional}" Value="False"/>
                                         </MultiDataTrigger.Conditions>
                                         <Setter TargetName="BtnAction" Property="Content" Value="CORRIGIR"/>
-                                        <Setter TargetName="BtnAction" Property="Background" Value="{StaticResource AccentColor}"/>
-                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="Background" Value="{DynamicResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
                                         <Setter TargetName="BtnAction" Property="Foreground" Value="Black"/>
                                     </MultiDataTrigger>
 
@@ -410,8 +410,8 @@
                                             <Condition Binding="{Binding Status}" Value="OK"/>
                                         </MultiDataTrigger.Conditions>
                                         <Setter TargetName="BtnAction" Property="Content" Value="CORRIGIR"/>
-                                        <Setter TargetName="BtnAction" Property="Background" Value="{StaticResource AccentColor}"/>
-                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="Background" Value="{DynamicResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
                                         <Setter TargetName="BtnAction" Property="Foreground" Value="Black"/>
                                     </MultiDataTrigger>
 
@@ -422,8 +422,8 @@
                                         </MultiDataTrigger.Conditions>
                                         <Setter TargetName="BtnAction" Property="Content" Value="REVERTER"/>
                                         <Setter TargetName="BtnAction" Property="Background" Value="Transparent"/>
-                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
-                                        <Setter TargetName="BtnAction" Property="Foreground" Value="{StaticResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                                        <Setter TargetName="BtnAction" Property="Foreground" Value="{DynamicResource AccentColor}"/>
                                     </MultiDataTrigger>
 
                                 </DataTemplate.Triggers>

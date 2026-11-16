@@ -4,32 +4,6 @@
       Title="Configura&#xE7;&#xF5;es"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
     
-    <Page.Resources>
-        <Style x:Key="SettingsCard" TargetType="Border">
-            <Setter Property="Background" Value="#1a1a1a"/>
-            <Setter Property="BorderBrush" Value="#333333"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="20"/>
-            <Setter Property="Margin" Value="0,0,0,15"/>
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect Color="#000000" BlurRadius="5" ShadowDepth="2" Opacity="0.3"/>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="BorderBrush" Value="{StaticResource AccentColor}"/>
-                    <Setter Property="Effect">
-                        <Setter.Value>
-                            <DropShadowEffect Color="#000000" BlurRadius="15" ShadowDepth="2" Opacity="0.5"/>
-                        </Setter.Value>
-                    </Setter>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-    </Page.Resources>
-
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="30">
             
@@ -38,7 +12,7 @@
                        FontSize="24" 
                        FontWeight="Bold" 
                        Margin="0,0,0,20"
-                       Foreground="{StaticResource AccentColor}"/>
+                       Foreground="{DynamicResource AccentColor}"/>
             
             <!-- Se&#xE7;&#xE3;o: Inicializa&#xE7;&#xE3;o -->
             <Border Style="{StaticResource SettingsCard}">
@@ -46,7 +20,7 @@
                     <TextBlock Text="INICIALIZA&#xC7;&#xC3;O" 
                                FontSize="13" 
                                FontWeight="Bold" 
-                               Foreground="{StaticResource AccentColor}"
+                               Foreground="{DynamicResource AccentColor}"
                                Margin="0,0,0,15"/>
                     
                     <Grid Margin="0,5">
@@ -56,7 +30,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Iniciar com Windows" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Inicia o Kit Lugia automaticamente" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Inicia o Kit Lugia automaticamente" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleStartup" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}"/>
                     </Grid>
@@ -72,7 +46,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Anima&#xE7;&#xE3;o de Intro" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Mostrar anima&#xE7;&#xE3;o de introdu&#xE7;&#xE3;o ao abrir" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Mostrar anima&#xE7;&#xE3;o de introdu&#xE7;&#xE3;o ao abrir" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleIntroAnimation" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
                     </Grid>
@@ -84,7 +58,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Dura&#xE7;&#xE3;o da Intro" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock x:Name="IntroDurationText" Text="3.0 segundos" FontSize="11" Foreground="#888888"/>
+                            <TextBlock x:Name="IntroDurationText" Text="3.0 segundos" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <Slider x:Name="IntroDurationSlider" Grid.Column="1" Width="150" Minimum="1.0" Maximum="10.0" Value="3.0" TickFrequency="0.5" IsSnapToTickEnabled="True" Margin="10,0,0,0"/>
                     </Grid>
@@ -97,7 +71,7 @@
                     <TextBlock Text="M&#xD3;DULOS DO KIT" 
                                FontSize="13" 
                                FontWeight="Bold" 
-                               Foreground="{StaticResource AccentColor}"
+                               Foreground="{DynamicResource AccentColor}"
                                Margin="0,0,0,15"/>
                     
                     <Grid Margin="0,5">
@@ -107,7 +81,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Monitor de RAM" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Monitoramento em tempo real e limpeza autom&#xE1;tica" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Monitoramento em tempo real e limpeza autom&#xE1;tica" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleRAMMonitor" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
                     </Grid>
@@ -119,7 +93,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="GameBoost Pro" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Otimiza&#xE7;&#xE3;o avan&#xE7;ada para jogos" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Otimiza&#xE7;&#xE3;o avan&#xE7;ada para jogos" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleGameBoost" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
                     </Grid>
@@ -131,7 +105,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Turbo Boot" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Ignora delay de inicializa&#xE7;&#xE3;o de apps" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Ignora delay de inicializa&#xE7;&#xE3;o de apps" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleTurboBoot" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}"/>
                     </Grid>
@@ -143,7 +117,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Turbo Shutdown" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Fecha apps antes de desligar" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Fecha apps antes de desligar" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleTurboShutdown" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}"/>
                     </Grid>
@@ -155,7 +129,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Standby Clean" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Evita ac&#xFA;mulo de lixo no Windows" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Evita ac&#xFA;mulo de lixo no Windows" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleStandbyClean" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
                     </Grid>
@@ -168,7 +142,7 @@
                     <TextBlock Text="&#xC1;UDIO"
                                FontSize="13"
                                FontWeight="Bold"
-                               Foreground="{StaticResource AccentColor}"
+                               Foreground="{DynamicResource AccentColor}"
                                Margin="0,0,0,15"/>
 
                     <Grid Margin="0,5">
@@ -179,13 +153,13 @@
                         <StackPanel Grid.Column="0" Margin="0,0,12,0">
                             <TextBlock Text="Anti-Stutter de &#xC1;udio" FontWeight="SemiBold" Foreground="White"/>
                             <TextBlock Text="Escuta os estalos do sistema em segundo plano e ressincroniza o motor de &#xE1;udio sozinho quando eles se repetem (2 estalos confirmados pelo Windows em 90s). Nada &#xE9; gravado &#x2014; s&#xF3; leitura do buffer de sa&#xED;da."
-                                       FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleAudioAntiStutter" Grid.Column="1"
                                   Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center"/>
                     </Grid>
 
-                    <TextBlock x:Name="TxtAudioStutterStatus" Text="" FontSize="11" Foreground="#888888"
+                    <TextBlock x:Name="TxtAudioStutterStatus" Text="" FontSize="11" Foreground="{DynamicResource TextMuted}"
                                TextWrapping="Wrap" Margin="0,9,0,0"/>
                 </StackPanel>
             </Border>
@@ -196,7 +170,7 @@
                     <TextBlock Text="MONITORAMENTO AVAN&#xC7;ADO"
                                FontSize="13"
                                FontWeight="Bold"
-                               Foreground="{StaticResource AccentColor}"
+                               Foreground="{DynamicResource AccentColor}"
                                Margin="0,0,0,15"/>
 
                     <Grid Margin="0,5">
@@ -207,7 +181,7 @@
                         <StackPanel Grid.Column="0" Margin="0,0,12,0">
                             <TextBlock Text="Alertas inteligentes" FontWeight="SemiBold" Foreground="White"/>
                             <TextBlock Text="Avisa quando um processo passa dos limites de RAM/CPU ou trava. Ative e ajuste os limites abaixo."
-                                       FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleSmartAlerts" Grid.Column="1"
                                   Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center"
@@ -221,7 +195,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Margin="0,0,12,0">
                             <TextBlock Text="Limiar de RAM por processo" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock x:Name="TxtHighRamStatus" Text="" FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="TxtHighRamStatus" Text="" FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                         <TextBox x:Name="TxtHighRamThreshold" Grid.Column="1" Width="90"
                                  Style="{StaticResource DarkTextBoxStyle}"
@@ -236,7 +210,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Margin="0,0,12,0">
                             <TextBlock Text="Limiar de CPU por processo" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock x:Name="TxtHighCpuStatus" Text="" FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="TxtHighCpuStatus" Text="" FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                         <TextBox x:Name="TxtHighCpuThreshold" Grid.Column="1" Width="90"
                                  Style="{StaticResource DarkTextBoxStyle}"
@@ -252,7 +226,7 @@
                         <StackPanel Grid.Column="0" Margin="0,0,12,0">
                             <TextBlock Text="Detec&#xE7;&#xE3;o de vazamento" FontWeight="SemiBold" Foreground="White"/>
                             <TextBlock Text="Observa processos que crescem sem parar e avisa (consome um pouco de CPU para medir)."
-                                       FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleAntiLeak" Grid.Column="1"
                                   Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center"
@@ -267,7 +241,7 @@
                         <StackPanel Grid.Column="0" Margin="0,0,12,0">
                             <TextBlock Text="An&#xE1;lise de comportamento" FontWeight="SemiBold" Foreground="White"/>
                             <TextBlock Text="Classifica padro&#xF5;es de uso de CPU por processo (instalador, jogo, ocioso) e registra no log."
-                                       FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleBehaviorAnalysis" Grid.Column="1"
                                   Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center"
@@ -282,7 +256,7 @@
                         <StackPanel Grid.Column="0" Margin="0,0,12,0">
                             <TextBlock Text="Assist&#xEA;ncia de foco" FontWeight="SemiBold" Foreground="White"/>
                             <TextBlock Text="Silencia tarefas de limpeza do kit enquanto uma janela em tela cheia est&#xE1; em foco (jogo/v&#xED;deo)."
-                                       FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleFocusAssist" Grid.Column="1"
                                   Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center"
@@ -297,7 +271,7 @@
                     <TextBlock Text="SISTEMA" 
                                FontSize="13" 
                                FontWeight="Bold" 
-                               Foreground="{StaticResource AccentColor}"
+                               Foreground="{DynamicResource AccentColor}"
                                Margin="0,0,0,15"/>
                     
                     <Grid Margin="0,5">
@@ -307,7 +281,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Notifica&#xE7;&#xF5;es" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Mostrar avisos e toasts do kit (erros e progresso sempre aparecem)" FontSize="11" Foreground="#888888" TextWrapping="Wrap"/>
+                            <TextBlock Text="Mostrar avisos e toasts do kit (erros e progresso sempre aparecem)" FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleNotifications" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
                     </Grid>
@@ -319,7 +293,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Log Detalhado" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Grava logs detalhados para debugging" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Grava logs detalhados para debugging" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleVerboseLogging" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}"/>
                     </Grid>
@@ -339,7 +313,7 @@
                                        FontSize="13" 
                                        FontWeight="Bold" 
                                        Foreground="#FF6B00"/>
-                            <TextBlock Text="Mostra ferramentas de diagn&#xF3;stico e debug" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Mostra ferramentas de diagn&#xF3;stico e debug" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleDeveloperMode" 
                                   Grid.Column="1" 
@@ -350,7 +324,7 @@
                     
                     <TextBlock Text="Ferramentas vis&#xED;veis quando ativado:" 
                                FontSize="11" 
-                               Foreground="#888888"
+                               Foreground="{DynamicResource TextMuted}"
                                Margin="0,0,0,10"/>
                     <StackPanel Margin="15,0">
                         <TextBlock Text="&#x2022; Diagn&#xF3;stico Interno (no menu lateral)" FontSize="11" Foreground="#CCCCCC"/>
@@ -374,7 +348,7 @@
                                        FontSize="13" 
                                        FontWeight="Bold" 
                                        Foreground="#FF6B00"/>
-                            <TextBlock Text="Abre todas as páginas uma por uma para identificar crashes" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Abre todas as páginas uma por uma para identificar crashes" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                     </Grid>
                     <TextBlock x:Name="TxtTestStatus" Text="Pronto para testar" FontSize="11" Foreground="#CCCCCC" Margin="0,0,0,10"/>
@@ -397,7 +371,7 @@
                     <TextBlock Text="DESINSTALAÇÃO" 
                                FontSize="13" 
                                FontWeight="Bold" 
-                               Foreground="{StaticResource AccentColor}"
+                               Foreground="{DynamicResource AccentColor}"
                                Margin="0,0,0,15"/>
 
                     <Grid Margin="0,5">
@@ -407,7 +381,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Criar Ponto de Restauração" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Cria um ponto de restauração antes de desinstalar programas" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Cria um ponto de restauração antes de desinstalar programas" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleRestorePoint" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
                     </Grid>
@@ -419,7 +393,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Perguntar antes de desinstalar" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Mostrar prompt perguntando se deseja criar ponto de restauração" FontSize="11" Foreground="#888888"/>
+                            <TextBlock Text="Mostrar prompt perguntando se deseja criar ponto de restauração" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <CheckBox x:Name="ToggleAskRestorePoint" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="True"/>
                     </Grid>

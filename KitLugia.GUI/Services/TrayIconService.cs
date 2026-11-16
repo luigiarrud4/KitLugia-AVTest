@@ -1220,7 +1220,7 @@ namespace KitLugia.GUI.Services
         {
             try
             {
-                string currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                string currentPath = GetAutoStartTargetPath();
                 if (string.IsNullOrEmpty(currentPath)) return false;
 
                 // 1. HKCU Run — método universal, funciona com e sem admin
@@ -1327,7 +1327,7 @@ namespace KitLugia.GUI.Services
         {
             try
             {
-                string currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                string currentPath = GetAutoStartTargetPath();
                 if (string.IsNullOrEmpty(currentPath)) return;
 
                 using (var ts = new TaskService())
@@ -1373,11 +1373,38 @@ namespace KitLugia.GUI.Services
         /// processo duplicado no boot. A preferencia e persistida em
         /// HKCU\Software\KitLugia\TraySettings\StartWithWindows.
         /// </summary>
+        /// <summary>
+        /// Caminho alvo do auto-start: o LAUNCHER (KitLugia.exe) quando ele existe ao
+        /// lado do app gerenciado, senao o proprio app.
+        ///
+        /// POR QUE: o app e' net10.0 framework-dependent. Numa maquina sem o .NET
+        /// Desktop Runtime 10, subir o app direto estoura o dialogo do apphost do
+        /// .NET ("voce precisa instalar o .NET") a CADA boot, sem nenhum controle.
+        /// O launcher (net48) verifica o runtime ANTES e, faltando, oferece instalar
+        /// na tela do Kit; em modo --tray (auto-start) ele sai em silencio e deixa
+        /// o registro no log, em vez de incomodar o usuario a cada boot.
+        /// </summary>
+        private static string GetAutoStartTargetPath()
+        {
+            string current = KitLugia.Core.AppPaths.GetRunningExePath();
+            if (string.IsNullOrEmpty(current)) return current;
+
+            try
+            {
+                string? launcher = KitLugia.Core.AppPaths.ResolveLauncherPath(
+                    Path.GetDirectoryName(current) ?? AppDomain.CurrentDomain.BaseDirectory);
+                if (!string.IsNullOrEmpty(launcher)) return launcher;
+            }
+            catch { }
+
+            return current;
+        }
+
         public static void SetAutoStart(bool enable)
         {
             try
             {
-                string path = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                string path = GetAutoStartTargetPath();
                 if (string.IsNullOrEmpty(path)) return;
 
                 if (!enable)
@@ -1691,7 +1718,7 @@ namespace KitLugia.GUI.Services
         {
             try
             {
-                string path = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                string path = GetAutoStartTargetPath();
                 if (string.IsNullOrEmpty(path)) return false;
 
                 // 1) Registry Run: valor esperado exato, ou mesmo alvo com --tray (variação de aspas)
@@ -1754,7 +1781,7 @@ namespace KitLugia.GUI.Services
         {
             try
             {
-                string currentPath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                string currentPath = GetAutoStartTargetPath();
 
                 string regValue = "";
                 using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
@@ -2909,9 +2936,7 @@ namespace KitLugia.GUI.Services
             try
             {
                 if (!SystemTweaks.IsForceStopUnlockAdded()) return;
-                string currentExe = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/'), "KitLugia.GUI.exe");
-                if (!System.IO.File.Exists(currentExe))
-                    currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                string currentExe = KitLugia.Core.AppPaths.GetAppExePathForRegistration();
                 if (string.IsNullOrEmpty(currentExe)) return;
                 var existing = Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Classes\*\shell\forcestopunlock\command", "", null) as string;
                 if (existing != null && !existing.Contains(currentExe, StringComparison.OrdinalIgnoreCase))

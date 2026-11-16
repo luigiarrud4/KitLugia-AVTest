@@ -11,7 +11,7 @@
     <Page.Resources>
         <Style TargetType="TabItem">
             <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Padding" Value="15,10"/>
             <Setter Property="Template">
@@ -22,8 +22,8 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentColor}" />
-                                <Setter Property="Foreground" Value="{StaticResource AccentColor}" />
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AccentColor}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}" />
                                 <Setter Property="FontWeight" Value="Bold" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -38,13 +38,13 @@
                     <ColumnDefinition />
                     <ColumnDefinition Width="20" />
                 </Grid.ColumnDefinitions>
-                <Border Grid.ColumnSpan="2" CornerRadius="6" Background="#1A1A1A" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" />
-                <Path Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0 Z" Fill="{StaticResource TextMuted}" />
+                <Border Grid.ColumnSpan="2" CornerRadius="6" Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" />
+                <Path Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0 Z" Fill="{DynamicResource TextMuted}" />
             </Grid>
         </ControlTemplate>
 
         <Style TargetType="{x:Type ComboBox}" x:Key="GoldComboBoxStyle">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="Background" Value="#1A1A1A"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Height" Value="45"/>
@@ -54,7 +54,7 @@
                 <Setter.Value>
                     <Style TargetType="ComboBoxItem">
                         <Setter Property="Background" Value="#1F1F1F"/>
-                        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
                         <Setter Property="Height" Value="40"/>
                         <Setter Property="MinHeight" Value="40"/>
                         <Setter Property="MaxHeight" Value="40"/>
@@ -71,11 +71,11 @@
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="bdr" Property="Background" Value="{StaticResource CardHover}"/>
+                                            <Setter TargetName="bdr" Property="Background" Value="{DynamicResource CardHover}"/>
                                         </Trigger>
                                         <Trigger Property="IsSelected" Value="True">
-                                            <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-                                            <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
+                                            <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -92,7 +92,7 @@
                             <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False" Content="{Binding SelectedItem.Name, RelativeSource={RelativeSource TemplatedParent}}" Margin="10,5,25,5" VerticalAlignment="Center" HorizontalAlignment="Left" />
                             <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
                                 <Grid x:Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="#1F1F1F" BorderThickness="1" CornerRadius="6" BorderBrush="{StaticResource CardBorder}"/>
+                                    <Border x:Name="DropDownBorder" Background="#1F1F1F" BorderThickness="1" CornerRadius="6" BorderBrush="{DynamicResource CardBorder}"/>
                                     <ScrollViewer Margin="0" SnapsToDevicePixels="True" CanContentScroll="False">
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
                                     </ScrollViewer>
@@ -108,20 +108,20 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="30,30,30,50" MaxWidth="900">
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="Ferramentas e Utilit&#xE1;rios" Margin="0,0,0,10"/>
-            <TextBlock Text="Fun&#xE7;&#xF5;es avan&#xE7;adas para reparo e configura&#xE7;&#xE3;o do sistema." Foreground="#A0A0A0" Margin="0,0,0,20"/>
+            <TextBlock Text="Fun&#xE7;&#xF5;es avan&#xE7;adas para reparo e configura&#xE7;&#xE3;o do sistema." Foreground="{DynamicResource TextDescription}" Margin="0,0,0,20"/>
 
             <TabControl x:Name="MainTabs" Background="Transparent" BorderThickness="0">
 
                 <!-- ABA 1: ENERGIA -->
                 <TabItem Header="Energia">
-                    <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
+                    <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
                         <StackPanel Width="600" HorizontalAlignment="Left">
                             <TextBlock Text="Gerenciador de Planos de Energia" FontSize="18" Foreground="White" Margin="0,0,0,20" FontWeight="SemiBold"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                                <TextBlock Text="Plano Atual: " Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="TxtCurrentPlan" Text="Carregando..." Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
+                                <TextBlock Text="Plano Atual: " Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtCurrentPlan" Text="Carregando..." Foreground="{DynamicResource AccentColor}" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
                             </StackPanel>
-                            <TextBlock Text="Selecionar Plano:" Foreground="{StaticResource TextMuted}" Margin="0,0,0,5"/>
+                            <TextBlock Text="Selecionar Plano:" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,5"/>
 
                             <ComboBox x:Name="CmbPowerPlans" Margin="0,0,0,10" Style="{StaticResource GoldComboBoxStyle}">
                                 <ComboBox.ItemTemplate>
@@ -148,7 +148,7 @@
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Border.Style>
-                                                <TextBlock Text="ATIVO" FontWeight="Bold" Foreground="#4CAF50" FontSize="11" 
+                                                <TextBlock Text="ATIVO" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" FontSize="11" 
                                                        VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                             </Border>
 
@@ -207,8 +207,8 @@
 
                             <Button Content="Ativar Plano Selecionado" Click="BtnActivatePlan_Click" Style="{StaticResource GoldButtonStyle}"/>
 
-                            <Separator Background="{StaticResource CardBorder}" Margin="0,25"/>
-                            <TextBlock Text="Planos Especiais" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                            <Separator Background="{DynamicResource CardBorder}" Margin="0,25"/>
+                            <TextBlock Text="Planos Especiais" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,10"/>
                             <Button Content="Desbloquear 'Desempenho M&#xE1;ximo' (Ultimate)" Click="BtnUltimate_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,10"/>
                             <Button Content="Importar 'Bitsum Highest Performance'" Click="BtnBitsum_Click" Style="{StaticResource SecondaryButtonStyle}"/>
                         </StackPanel>
@@ -217,7 +217,7 @@
 
                 <!-- ABA 2: REDE -->
                 <TabItem Header="Rede (DNS)">
-                    <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
+                    <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
                         <StackPanel Width="500" HorizontalAlignment="Left">
                             <TextBlock Text="Otimiza&#xE7;&#xE3;o de DNS" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
                             <Grid>
@@ -229,22 +229,22 @@
                                 <Button Grid.Column="1" Content="Google (8.8.8.8)" Click="BtnDnsGoogle_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="5,0,0,10"/>
                             </Grid>
                             <Button Content="Restaurar Autom&#xE1;tico (DHCP)" Click="BtnDnsDhcp_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                            <Separator Background="{StaticResource CardBorder}" Margin="0,25"/>
+                            <Separator Background="{DynamicResource CardBorder}" Margin="0,25"/>
                             <TextBlock Text="Reparo de Rede" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
                             <Button Content="Limpar Cache DNS (FlushDNS)" Click="BtnFlushDns_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,10"/>
-                            <Button Content="Resetar Pilha de Rede (TCP/IP Reset)" Click="BtnNetReset_Click" Style="{StaticResource GoldButtonStyle}" Background="#C42B1C" BorderBrush="#C42B1C"/>
+                            <Button Content="Resetar Pilha de Rede (TCP/IP Reset)" Click="BtnNetReset_Click" Style="{StaticResource GoldButtonStyle}" Background="{DynamicResource ErrorBrush}" BorderBrush="{DynamicResource ErrorBrush}"/>
                         </StackPanel>
                     </Border>
                 </TabItem>
 
                 <!-- ABA 3: SISTEMA -->
                 <TabItem Header="Sistema &amp; Loja">
-                    <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
+                    <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
                         <StackPanel Width="500" HorizontalAlignment="Left">
                             <TextBlock Text="Microsoft Store &amp; Xbox" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
                             <Button Content="Resetar Cache da Loja (WSReset)" Click="BtnStoreReset_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,10"/>
                             <Button Content="Reparar Gaming Services" Click="BtnGamingServices_Click" Style="{StaticResource SecondaryButtonStyle}"/>
-                            <Separator Background="{StaticResource CardBorder}" Margin="0,25"/>
+                            <Separator Background="{DynamicResource CardBorder}" Margin="0,25"/>
                             <TextBlock Text="Extras do Sistema" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
                             <Button Content="Ativar Editor de Pol&#xED;tica de Grupo (GPEDIT)" Click="BtnGpedit_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,10"/>
                             <Button Content="Ativar/Desativar 'God Mode' no Desktop" Click="BtnGodMode_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,10"/>
@@ -255,7 +255,7 @@
 
                 <!-- ABA 4: EXPLORER & MENU (NOVA!) -->
                 <TabItem Header="Explorer &amp; Menu">
-                    <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
+                    <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Margin="0,20,0,0" Padding="25">
                         <StackPanel Width="600" HorizontalAlignment="Left">
                             <TextBlock Text="Menu de Contexto (Bot&#xE3;o Direito)" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
 
@@ -285,7 +285,7 @@
                                 <Button Grid.Column="2" Content="Adicionar / Remover" Click="BtnToggleCmd_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150"/>
                             </Grid>
 
-                            <Separator Background="{StaticResource CardBorder}" Margin="0,20"/>
+                            <Separator Background="{DynamicResource CardBorder}" Margin="0,20"/>
 
                             <TextBlock Text="Visualiza&#xE7;&#xE3;o de Arquivos" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
 
@@ -315,7 +315,7 @@
                                 <Button Grid.Column="2" Content="Alternar" Click="BtnToggleExtensions_Click" Style="{StaticResource SecondaryButtonStyle}" Width="150"/>
                             </Grid>
 
-                            <Separator Background="{StaticResource CardBorder}" Margin="0,20"/>
+                            <Separator Background="{DynamicResource CardBorder}" Margin="0,20"/>
                             <TextBlock Text="Impress&#xE3;o" FontSize="18" Foreground="White" Margin="0,0,0,15" FontWeight="SemiBold"/>
 
                             <Button Content="&#x1F5A8;&#xFE0F; Limpar Fila de Impress&#xE3;o (Spooler)" Click="BtnClearSpooler_Click" Style="{StaticResource GoldButtonStyle}" 

@@ -2032,6 +2032,18 @@ namespace KitLugia.Core
 
                         // 2.1. Script de Primeiro Logon que orquestra tudo
                         StringBuilder sb = new StringBuilder();
+                        // Nome do executavel do APP dentro da pasta de instalacao
+                        // (o app e' copiado inteiro, entao mantem o nome do arquivo).
+                        string appExeFileName = "";
+                        try
+                        {
+                            string appExePath = AppPaths.GetAppExePathForRegistration();
+                            if (!string.IsNullOrEmpty(appExePath))
+                                appExeFileName = Path.GetFileName(appExePath);
+                        }
+                        catch { }
+                        if (string.IsNullOrWhiteSpace(appExeFileName))
+                            appExeFileName = AppPaths.AppExeFileName;
                         sb.AppendLine("@echo off");
                         sb.AppendLine("TITLE KitLugia - Finalizando Configuracao");
                         sb.AppendLine("color 0E");
@@ -2073,7 +2085,7 @@ namespace KitLugia.Core
 
                             // Criar Atalhos no Desktop via PowerShell
                             sb.AppendLine("echo Criando atalhos na Area de Trabalho...");
-                            string psLaunch = $"$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\KitLugia.lnk');$s.TargetPath='{KitLugiaInstallPath}\\KitLugia.GUI.exe';$s.WorkingDirectory='{KitLugiaInstallPath}';$s.Save()";
+                            string psLaunch = $"$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\KitLugia.lnk');$s.TargetPath='{KitLugiaInstallPath}\\{appExeFileName}';$s.WorkingDirectory='{KitLugiaInstallPath}';$s.Save()";
                             sb.AppendLine($"powershell -NoProfile -Command \"{psLaunch}\"");
                         }
 
@@ -2103,7 +2115,7 @@ namespace KitLugia.Core
                         if (injectKit)
                         {
                             sb.AppendLine("echo Abrindo KitLugia...");
-                            sb.AppendLine($"start \"\" \"{KitLugiaInstallPath}\\KitLugia.GUI.exe\""); 
+                            sb.AppendLine($"start \"\" \"{KitLugiaInstallPath}\\{appExeFileName}\"");
                         }
 
                         sb.AppendLine("echo Concluido! Esta janela fechara em instantes.");
@@ -2855,7 +2867,7 @@ namespace KitLugia.Core
             });
         }
 
-        public static async Task<bool> CreateBootPartition(string sourceDriveLetter, int sizeMb, string label, bool multiIso = false, bool safeMode = false, string? isoPath = null, Action<double, string>? progressCallback = null, Func<string, Task<bool>>? promptCallback = null)
+        public static async Task<bool> CreateBootPartition(string sourceDriveLetter, int sizeMb, string label, bool multiIso = false, bool safeMode = false, string? isoPath = null, Action<double, string>? progressCallback = null, Func<string, Task<bool>>? promptCallback = null, Func<string, Task<bool>>? noWinpeFallbackCallback = null)
         {
             Log($"Iniciando criação de partição no disco de origem {sourceDriveLetter} (Multi-ISO: {multiIso})...");
 
@@ -3008,11 +3020,41 @@ namespace KitLugia.Core
 
                 Log($"🔧 Tentando criar partição de {sizeMb}MB ({sizeMb / 1024}GB)...");
 
+                // Se já existe uma área não alocada contígua suficiente no disco alvo
+                // (por exemplo, criada pelo shrink sem WinPE no reboot anterior), use-a
+                // diretamente em vez de reduzir o volume uma segunda vez.
+                uint targetDiskIndex = 0;
+                bool hasTargetDisk = false;
+                bool hasEnoughUnallocated = false;
+                try
+                {
+                    var targetDisks = PartitionManager.GetAllDisks();
+                    var targetDisk = targetDisks.FirstOrDefault(d => d.Partitions.Any(p =>
+                        string.Equals(p.DriveLetter?.TrimEnd(':'), sourceDriveLetter.Trim().TrimEnd(':'), StringComparison.OrdinalIgnoreCase)));
+                    if (targetDisk != null)
+                    {
+                        targetDiskIndex = targetDisk.Index;
+                        hasTargetDisk = true;
+                        ulong neededBytes = checked((ulong)sizeMb * 1024UL * 1024UL);
+                        hasEnoughUnallocated = targetDisk.Partitions.Any(p => p.IsUnallocated && p.Size >= neededBytes);
+                    }
+                }
+                catch (Exception ex) { Log($"Aviso ao verificar espaço não alocado existente: {ex.Message}"); }
+
                 StringBuilder script = new StringBuilder();
                 script.AppendLine("rescan");
-                script.AppendLine($"select volume {sourceDriveLetter}");
-                script.AppendLine($"shrink desired={sizeMb} minimum={sizeMb}");
-                script.AppendLine("create partition primary");
+                if (hasEnoughUnallocated && hasTargetDisk)
+                {
+                    Log($"Usando espaço não alocado existente no disco {targetDiskIndex} ({sizeMb} MB necessários).");
+                    script.AppendLine($"select disk {targetDiskIndex}");
+                    script.AppendLine($"create partition primary size={sizeMb}");
+                }
+                else
+                {
+                    script.AppendLine($"select volume {sourceDriveLetter}");
+                    script.AppendLine($"shrink desired={sizeMb} minimum={sizeMb}");
+                    script.AppendLine("create partition primary");
+                }
                 
                 string fs = multiIso ? "fat32" : "ntfs";
                 script.AppendLine($"format quick fs={fs} label=\"{WINBOOT_LABEL}\"");
@@ -3051,7 +3093,6 @@ namespace KitLugia.Core
                 var (exitCode, output) = await RunProcessCaptured("diskpart.exe", $"/s \"{scriptPath}\"");
                 Log("--- DISKPART OUTPUT ---");
                 Log(output);
-                File.Delete(scriptPath);
 
 
                 // ExitCode 0 = sucesso, != 0 = erro (independente do idioma)
@@ -3062,6 +3103,20 @@ namespace KitLugia.Core
                     Log($"⚠️ CAUSA: O Windows impõe limites no shrink devido a arquivos imóveis (pagefile.sys, hiberfil.sys, shadow copies)");
                     Log($"");
                     Log($"💡 Compact OS: compactar o sistema pode liberar espaço suficiente para o shrink");
+
+                    if (noWinpeFallbackCallback != null)
+                    {
+                        bool scheduled = await noWinpeFallbackCallback(
+                            $"O Windows não conseguiu reduzir {sourceDriveLetter} para abrir {sizeMb / 1024.0:F1} GB para a instalação.\n\n" +
+                            "Deseja preparar o shrink profundo sem WinPE? O Kit tentará liberar os bloqueios e reiniciará o PC; " +
+                            "depois do reboot, volte ao WinBoot e inicie a criação novamente.");
+                        if (scheduled)
+                        {
+                            Log("Shrink sem WinPE agendado após falha da redução normal. O usuário deverá retomar a criação do WinBoot após reiniciar.");
+                            try { File.Delete(scriptPath); } catch { }
+                            return false;
+                        }
+                    }
 
                     if (promptCallback != null)
                     {
@@ -3105,9 +3160,12 @@ namespace KitLugia.Core
 
                     Log($"");
                     Log($"💡 SOLUÇÃO: Use o método de shrink da página de Partições com o modo atômico ativado");
+                    try { File.Delete(scriptPath); } catch { }
                     return false;
                 }
                 AfterDiskpart:
+
+                try { File.Delete(scriptPath); } catch { }
 
                 Log("Diskpart concluído com sucesso (ExitCode 0).");
 
@@ -3402,7 +3460,7 @@ namespace KitLugia.Core
             return size;
         }
 
-        public static int CalculateRequiredSizeGB(string? userInjectedPath = null)
+        public static int CalculateRequiredSizeGB(string? userInjectedPath = null, string? isoPath = null)
         {
             try 
             {
@@ -3428,10 +3486,21 @@ namespace KitLugia.Core
                     injectedSize = GetDirectorySize(userInjectedPath);
                 }
 
-                // Buffer de Segurança: 2GB (Updates, Logs, Temp)
+                // O baseline já reservava 2GB para uma ISO pequena. Acrescenta-se somente
+                // o excedente da ISO selecionada, com 10% de margem para diferenças entre
+                // tamanho do container e conteúdo extraído.
+                long isoAdditional = 0;
+                if (!string.IsNullOrWhiteSpace(isoPath) && File.Exists(isoPath))
+                {
+                    long isoBytes = new FileInfo(isoPath).Length;
+                    long beyondSmallIso = Math.Max(0, isoBytes - 2L * 1024 * 1024 * 1024);
+                    isoAdditional = (long)Math.Ceiling(beyondSmallIso * 1.10);
+                }
+
+                // Buffer de Segurança: 2GB (updates, logs, temporários)
                 long bufferSize = 2L * 1024 * 1024 * 1024;
 
-                long totalBytes = baseSize + appSize + goodiesSize + injectedSize + bufferSize;
+                long totalBytes = checked(baseSize + appSize + goodiesSize + injectedSize + isoAdditional + bufferSize);
 
                 // Converter para GB arredondado para cima
                 double gb = (double)totalBytes / (1024 * 1024 * 1024);
@@ -3440,9 +3509,15 @@ namespace KitLugia.Core
                 // Mínimo 8GB para evitar problemas
                 return Math.Max(8, totalGB);
             }
-            catch 
+            catch
             {
-                return 8; // Fallback seguro
+                // Se a ISO puder ser lida, não subdimensiona silenciosamente para 8GB.
+                if (!string.IsNullOrWhiteSpace(isoPath) && File.Exists(isoPath))
+                {
+                    long isoGb = (long)Math.Ceiling(new FileInfo(isoPath).Length / (double)(1024L * 1024 * 1024));
+                    return (int)Math.Min(int.MaxValue, Math.Max(8L, isoGb + 6));
+                }
+                return 8;
             }
         }
 

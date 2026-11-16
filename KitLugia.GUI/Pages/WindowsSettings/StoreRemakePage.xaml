@@ -120,7 +120,7 @@
                 </StackPanel>
             </Button>
             <!-- Mega query box estilo UniGetUI: caixa larga com underline accent no focus -->
-            <Border Grid.Column="1" x:Name="MegaQueryContainer" Background="#1A1A1A" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Height="40" VerticalAlignment="Center">
+            <Border Grid.Column="1" x:Name="MegaQueryContainer" Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Height="40" VerticalAlignment="Center">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -166,7 +166,7 @@
         </Grid>
 
         <!-- ============ DATA GRID estilo UniGetUI (colunas: ícone, nome, id, versão, nova versão, fonte) ============ -->
-        <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="8">
+        <Border Grid.Row="3" Style="{DynamicResource CardBorder}" Padding="8">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -276,7 +276,7 @@
         </Border>
 
         <!-- ============ STATUS BAR estilo UniGetUI: gerenciadores detectados + contador ============ -->
-        <Border Grid.Row="4" Background="#252525" BorderBrush="#333333" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,8,0,0">
+        <Border Grid.Row="4" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,8,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -286,7 +286,7 @@
                 <ScrollViewer MaxHeight="52" VerticalScrollBarVisibility="Auto" VerticalAlignment="Center">
                     <TextBlock x:Name="TxtLog" Text="Pronto." FontSize="11" Foreground="#6A6A6A" TextWrapping="Wrap" FontFamily="Consolas"/>
                 </ScrollViewer>
-                <TextBlock x:Name="TxtStatusCounts" Grid.Column="1" Text="" FontSize="11" Foreground="#8A8A8A" VerticalAlignment="Center" Margin="10,0"/>
+                <TextBlock x:Name="TxtStatusCounts" Grid.Column="1" Text="" FontSize="11" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" Margin="10,0"/>
                 <Button x:Name="BtnCopyLog" Grid.Column="2" Content="Copiar" FontSize="11" Style="{StaticResource GhostBtn}" Padding="8,3" Click="BtnCopyLog_Click" ToolTip="Copiar log (também visível no log do Kit)"/>
             </Grid>
         </Border>
@@ -313,16 +313,16 @@
                     <TextBlock x:Name="TxtInlineStatus" Grid.Column="1" Text="" FontSize="12" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                     <TextBlock x:Name="TxtInlinePercent" Grid.Column="2" Text="" FontSize="13" FontWeight="Bold" Foreground="#0078D4" VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </Grid>
-                <Border x:Name="InlineProgressTrack" Background="#333333" CornerRadius="3" Height="4">
+                <Border x:Name="InlineProgressTrack" Background="{DynamicResource BorderSubtle}" CornerRadius="3" Height="4">
                     <Border x:Name="InlineProgressFill" Background="#0078D4" CornerRadius="3" HorizontalAlignment="Left" Width="0"/>
                 </Border>
-                <TextBlock x:Name="TxtInlineDetail" Text="" FontSize="11" Foreground="#8A8A8A" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="TxtInlineDetail" Text="" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
         </Border>
 
         <!-- Detail modal -->
         <Border x:Name="DetailOverlay" Visibility="Collapsed" Grid.Row="3" Panel.ZIndex="200" Background="#CC000000" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" MouseLeftButtonDown="DetailOverlay_MouseLeftButtonDown">
-            <Border HorizontalAlignment="Center" VerticalAlignment="Center" Width="640" MaxHeight="520" Background="#1E1E1E" BorderBrush="#333333" BorderThickness="1" CornerRadius="12">
+            <Border HorizontalAlignment="Center" VerticalAlignment="Center" Width="640" MaxHeight="520" Background="#1E1E1E" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="12">
                 <Border.Effect>
                     <DropShadowEffect Color="#000000" BlurRadius="24" ShadowDepth="8" Opacity="0.6"/>
                 </Border.Effect>

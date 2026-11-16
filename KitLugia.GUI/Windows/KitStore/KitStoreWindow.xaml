@@ -19,7 +19,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <!-- DRAG BAR igual TaskManager -->
-            <Border Grid.Row="0" Background="#1A1A1A" BorderBrush="#2A2A2A" BorderThickness="0,0,0,1" MouseLeftButtonDown="DragBar_MouseDown" Cursor="SizeAll">
+            <Border Grid.Row="0" Background="{DynamicResource Surface1}" BorderBrush="#2A2A2A" BorderThickness="0,0,0,1" MouseLeftButtonDown="DragBar_MouseDown" Cursor="SizeAll">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -48,7 +48,7 @@
                     </StackPanel>
                 </Grid>
             </Border>
-            <Frame x:Name="MainFrame" Grid.Row="1" NavigationUIVisibility="Hidden" Background="#1A1A1A"/>
+            <Frame x:Name="MainFrame" Grid.Row="1" NavigationUIVisibility="Hidden" Background="{DynamicResource Surface1}"/>
         </Grid>
     </Border>
 </Window>

@@ -6,13 +6,13 @@
         WindowStartupLocation="CenterOwner"
         TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Consolas, Segoe UI Emoji"
         TextElement.Foreground="White"
-        Background="#0F0F0F"
+        Background="{DynamicResource Surface0}"
         ShowInTaskbar="False"
         ResizeMode="CanResizeWithGrip">
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" ResizeBorderThickness="6"/>
     </WindowChrome.WindowChrome>
-    <Border BorderBrush="#FFD700" BorderThickness="1">
+    <Border BorderBrush="{DynamicResource AccentColor}" BorderThickness="1">
         <Grid Margin="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -23,7 +23,7 @@
 
             <!-- Header -->
             <StackPanel Grid.Row="0" Margin="0,0,0,10">
-                <TextBlock x:Name="TitleText" FontSize="16" FontWeight="SemiBold" Foreground="#FFD700" TextWrapping="Wrap"/>
+                <TextBlock x:Name="TitleText" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" TextWrapping="Wrap"/>
                 <TextBlock x:Name="ErrorText" FontSize="11" Foreground="#999999" TextWrapping="Wrap" Margin="0,4,0,0"/>
                 <TextBlock Text="Abaixo só aparecem itens com 100% de certeza de que pertencem a este programa (dentro da pasta de instalação ou pasta/registro com o nome exato do app). Tudo vai para a Lixeira, com backup — nada é apagado permanentemente."
                            FontSize="11" Foreground="#777777" TextWrapping="Wrap" Margin="0,6,0,0"/>
@@ -42,8 +42,8 @@
                             </Grid.ColumnDefinitions>
                             <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="📁 Pastas do programa (100% de certeza)" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,4"/>
-                                <TextBlock x:Name="FoldersHint" FontSize="11" Foreground="#888888" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <TextBlock Text="📁 Pastas do programa (100% de certeza)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="FoldersHint" FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                 <ItemsControl x:Name="FolderList">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -67,8 +67,8 @@
                             </Grid.ColumnDefinitions>
                             <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="📄 Arquivos do programa (100% de certeza)" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,4"/>
-                                <TextBlock x:Name="FilesHint" FontSize="11" Foreground="#888888" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <TextBlock Text="📄 Arquivos do programa (100% de certeza)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="FilesHint" FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                 <ItemsControl x:Name="FileList">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -92,8 +92,8 @@
                             </Grid.ColumnDefinitions>
                             <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="🗝️ Itens de registro (100% de certeza)" FontSize="14" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,4"/>
-                                <TextBlock x:Name="RegHint" FontSize="11" Foreground="#888888" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <TextBlock Text="🗝️ Itens de registro (100% de certeza)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="RegHint" FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                 <ItemsControl x:Name="RegList">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -117,7 +117,7 @@
             <!-- Footer -->
             <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                 <Button x:Name="BtnClean" Content="🗑️ Limpar selecionados (0)" MinWidth="220" Height="32" Margin="0,0,8,0"
-                        Background="#FFD700" Foreground="#111111" FontWeight="SemiBold" BorderBrush="#FFD700" BorderThickness="1"
+                        Background="{DynamicResource AccentColor}" Foreground="#111111" FontWeight="SemiBold" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1"
                         Cursor="Hand" Click="BtnClean_Click"/>
                 <Button Content="Fechar" Width="90" Height="32"
                         Background="#2A2A2A" Foreground="White" BorderBrush="#444444" BorderThickness="1"

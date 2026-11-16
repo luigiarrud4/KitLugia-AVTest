@@ -5,6 +5,7 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:local="clr-namespace:KitLugia.GUI.Pages"
+      xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
       mc:Ignorable="d"
       Title="Informações do Sistema"
       TextElement.FontFamily="Segoe UI Variable, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
@@ -20,52 +21,52 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="Informações do Sistema" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-            <TextBlock Text="Monitoramento em tempo real — CPU, GPU, RAM, disco e rede" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0"/>
-            <TextBlock x:Name="TxtLoadError" Text="" FontSize="12" Foreground="{StaticResource ErrorBrush}" Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+            <TextBlock Text="Informações do Sistema" FontSize="26" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+            <TextBlock Text="Monitoramento em tempo real — CPU, GPU, RAM, disco e rede" FontSize="12" Foreground="{DynamicResource TextMuted}" Margin="0,4,0,0"/>
+            <TextBlock x:Name="TxtLoadError" Text="" FontSize="12" Foreground="{DynamicResource ErrorBrush}" Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
         </StackPanel>
 
         <!-- Gauges -->
         <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,0,16">
             <!-- CPU Gauge -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="12" Margin="6">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="12" Margin="6">
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="CPU" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="CPU" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
                     <Grid Width="110" Height="110">
                         <Ellipse Stroke="#2A2A2A" StrokeThickness="8" Width="100" Height="100" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        <Path x:Name="ArcCpu" Stroke="{StaticResource AccentColor}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent"/>
-                        <TextBlock x:Name="TxtCpuPct" Text="0%" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Path x:Name="ArcCpu" Stroke="{DynamicResource AccentColor}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent"/>
+                        <TextBlock x:Name="TxtCpuPct" Text="0%" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
-                    <TextBlock x:Name="TxtCpuName" Text="-" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0" TextWrapping="Wrap" MaxWidth="120"/>
-                    <TextBlock x:Name="TxtCpuTemp" Text="Temp: -°C" FontSize="11" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,2"/>
+                    <TextBlock x:Name="TxtCpuName" Text="-" FontSize="11" Foreground="{DynamicResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0" TextWrapping="Wrap" MaxWidth="120"/>
+                    <TextBlock x:Name="TxtCpuTemp" Text="Temp: -°C" FontSize="11" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" Margin="0,2"/>
                 </StackPanel>
             </Border>
 
             <!-- RAM Gauge -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="12" Margin="6">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="12" Margin="6">
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="RAM" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="RAM" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
                     <Grid Width="110" Height="110">
                         <Ellipse Stroke="#2A2A2A" StrokeThickness="8" Width="100" Height="100" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         <Path x:Name="ArcRam" Stroke="#B36AE2" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent"/>
-                        <TextBlock x:Name="TxtRamPct" Text="0%" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TxtRamPct" Text="0%" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
-                    <TextBlock x:Name="TxtRam" Text="- / - GB" FontSize="11" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,6,0,0"/>
-                    <TextBlock x:Name="TxtRamUsed" Text="Usado: -" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,2"/>
+                    <TextBlock x:Name="TxtRam" Text="- / - GB" FontSize="11" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                    <TextBlock x:Name="TxtRamUsed" Text="Usado: -" FontSize="11" Foreground="{DynamicResource TextMuted}" HorizontalAlignment="Center" Margin="0,2"/>
                 </StackPanel>
             </Border>
 
             <!-- GPU Gauge -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="12" Margin="6">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="12" Margin="6">
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="GPU" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="GPU" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
                     <Grid Width="110" Height="110">
                         <Ellipse Stroke="#2A2A2A" StrokeThickness="8" Width="100" Height="100" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        <Path x:Name="ArcGpu" Stroke="#4CAF50" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent"/>
-                        <TextBlock x:Name="TxtGpuPct" Text="-" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Path x:Name="ArcGpu" Stroke="{DynamicResource SuccessBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent"/>
+                        <TextBlock x:Name="TxtGpuPct" Text="-" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
-                    <TextBlock x:Name="TxtGpuName" Text="-" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0" TextWrapping="Wrap" MaxWidth="120"/>
-                    <TextBlock x:Name="TxtGpuTemp" Text="Temp: -°C" FontSize="11" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,2"/>
+                    <TextBlock x:Name="TxtGpuName" Text="-" FontSize="11" Foreground="{DynamicResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0" TextWrapping="Wrap" MaxWidth="120"/>
+                    <TextBlock x:Name="TxtGpuTemp" Text="Temp: -°C" FontSize="11" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" Margin="0,2"/>
                 </StackPanel>
             </Border>
         </UniformGrid>
@@ -82,11 +83,11 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="💻 PC / Sistema" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="💻 PC / Sistema" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListPc">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -103,11 +104,11 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🛠️ Placa-mãe" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🛠️ Placa-mãe" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListMotherboard">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -124,11 +125,11 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="⚙️ BIOS" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="⚙️ BIOS" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListBios">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -145,19 +146,19 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🖥️ Sistema Operacional" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🖥️ Sistema Operacional" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListOS">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <TextBlock x:Name="TxtPc" Text="PC: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
-                            <TextBlock x:Name="TxtOs" Text="SO: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
-                            <TextBlock x:Name="TxtArch" Text="Arquitetura: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
-                            <TextBlock x:Name="TxtUptime" Text="Uptime: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
-                            <TextBlock x:Name="TxtCores" Text="Núcleos lógicos: -" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2"/>
+                            <TextBlock x:Name="TxtPc" Text="PC: -" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2"/>
+                            <TextBlock x:Name="TxtOs" Text="SO: -" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2"/>
+                            <TextBlock x:Name="TxtArch" Text="Arquitetura: -" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2"/>
+                            <TextBlock x:Name="TxtUptime" Text="Uptime: -" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2"/>
+                            <TextBlock x:Name="TxtCores" Text="Núcleos lógicos: -" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -171,15 +172,15 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="💾 Armazenamento" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="💾 Armazenamento" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListStorage">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <TextBlock x:Name="TxtStorageRealtime" Text="" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="TxtStorageRealtime" Text="" FontSize="12" Foreground="{DynamicResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -193,15 +194,15 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🌐 Rede" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🌐 Rede" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListNetwork">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <TextBlock x:Name="TxtNetworkRealtime" Text="" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="TxtNetworkRealtime" Text="" FontSize="12" Foreground="{DynamicResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -215,11 +216,11 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🔊 Áudio" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🔊 Áudio" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListAudio">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -236,11 +237,11 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🔋 Bateria" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🔋 Bateria" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListBattery">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -257,11 +258,11 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🔐 TPM" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🔐 TPM" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListTpm">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -278,11 +279,11 @@
                         </Grid.ColumnDefinitions>
                         <Rectangle Grid.Column="0" Fill="#33FFD700" VerticalAlignment="Stretch" Margin="0,0,12,0" RadiusX="2" RadiusY="2"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="🌡️ Zona Térmica" FontSize="13" FontWeight="SemiBold" Foreground="#FFD700" Margin="0,0,0,8"/>
+                            <TextBlock Text="🌡️ Zona Térmica" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,8"/>
                             <ItemsControl x:Name="ListThermal">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,2" TextWrapping="Wrap"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -295,16 +296,8 @@
         <!-- OVERLAY DE CARREGAMENTO (variante A do contrato: Themes/Spinners.xaml).
              A coleta de hardware (WMI + GPU + rede) roda em background; sem este
              overlay a pagina ficava congelada, sem resposta e sem feedback. -->
-        <Grid x:Name="LoadingOverlay" Grid.RowSpan="3" Panel.ZIndex="90" Background="#CC000000" Visibility="Collapsed">
-            <Border HorizontalAlignment="Center" VerticalAlignment="Center"
-                    Background="{StaticResource Surface1}" BorderBrush="{StaticResource BorderSubtle}"
-                    BorderThickness="1" CornerRadius="8" Width="400" Padding="24">
-                <StackPanel>
-                    <ContentControl Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
-                    <TextBlock x:Name="TxtLoadingMessage" Text="Carregando informações do sistema..." FontSize="16" Foreground="White" Margin="0,15,0,0" TextAlignment="Center"/>
-                    <TextBlock Text="Coletando dados de hardware (WMI, GPU, rede)" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,6,0,0" TextAlignment="Center"/>
-                </StackPanel>
-            </Border>
-        </Grid>
+        <controls:AreaLoadingOverlay x:Name="LoadingOverlay" Grid.RowSpan="3" Panel.ZIndex="90" Visibility="Collapsed"
+                                      Message="Carregando informações do sistema..."
+                                      Subtitle="Coletando dados de hardware (WMI, GPU, rede)"/>
     </Grid>
 </Page>

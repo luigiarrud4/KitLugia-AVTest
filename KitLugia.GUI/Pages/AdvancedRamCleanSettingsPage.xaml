@@ -5,47 +5,10 @@
       Title="Configura&#xE7;&#xF5;es Avan&#xE7;adas de Limpeza de RAM"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
     
-    <Page.Resources>
-        <Style x:Key="AdvancedToggle" TargetType="CheckBox">
-            <Setter Property="Width" Value="44"/>
-            <Setter Property="Height" Value="24"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Border x:Name="toggleBorder" 
-                                Background="#3E3E3E" 
-                                CornerRadius="12"
-                                BorderThickness="1"
-                                BorderBrush="#505050">
-                            <Ellipse x:Name="toggleCircle" 
-                                     Width="14" Height="14"
-                                     Fill="#BBBBBB"
-                                     HorizontalAlignment="Left"
-                                     VerticalAlignment="Center"
-                                     Margin="4,0">
-                                <Ellipse.Effect>
-                                    <DropShadowEffect ShadowDepth="1" BlurRadius="2" Opacity="0.3"/>
-                                </Ellipse.Effect>
-                            </Ellipse>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="toggleBorder" Property="Background" Value="{StaticResource AccentColor}"/>
-                                <Setter TargetName="toggleBorder" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
-                                <Setter TargetName="toggleCircle" Property="Fill" Value="#101010"/>
-                                <Setter TargetName="toggleCircle" Property="HorizontalAlignment" Value="Right"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Page.Resources>
-
     <Grid Background="#E0000000">
-        <Border Background="#1A1A1A" 
+        <Border Background="{DynamicResource Surface1}" 
                 CornerRadius="12" 
-                BorderBrush="#333" 
+                BorderBrush="{DynamicResource BorderSubtle}" 
                 BorderThickness="1"
                 MaxWidth="600"
                 MaxHeight="700"
@@ -55,14 +18,14 @@
             <Grid>
                 <!-- Header com X para fechar -->
                 <Grid Height="50" VerticalAlignment="Top">
-                    <Border Background="#252525" CornerRadius="12,12,0,0">
+                    <Border Background="{DynamicResource Surface2}" CornerRadius="12,12,0,0">
                         <Grid Margin="15,0,0,0">
                             <TextBlock Text="&#x2699;&#xFE0F; CONFIGURA&#xC7;&#xD5;ES AVAN&#xC7;ADAS DE LIMPEZA DE RAM" 
                                        FontSize="16" 
                                        FontWeight="Bold" 
                                        VerticalAlignment="Center"
                                        HorizontalAlignment="Center"
-                                       Foreground="{StaticResource AccentColor}"/>
+                                       Foreground="{DynamicResource AccentColor}"/>
                             
                             <Button x:Name="BtnClose"
                                     Content="&#x2715;" 
@@ -222,13 +185,13 @@
                     <TextBlock Text="Limite de Auto-Reduct (%)" FontSize="11" Foreground="#888" Margin="0,0,0,3"/>
                     <Grid Margin="0,0,0,10">
                         <Slider x:Name="SliderAutoReductLimit" Minimum="50" Maximum="95" Value="90" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="TxtAutoReductLimit" Text="90%" Foreground="{StaticResource AccentColor}" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,-20,0,0" FontSize="12"/>
+                        <TextBlock x:Name="TxtAutoReductLimit" Text="90%" Foreground="{DynamicResource AccentColor}" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,-20,0,0" FontSize="12"/>
                     </Grid>
                     
                     <TextBlock Text="Intervalo de Auto-Reduct (segundos)" FontSize="11" Foreground="#888" Margin="0,0,0,3"/>
                     <Grid Margin="0,0,0,10">
                         <Slider x:Name="SliderAutoReductInterval" Minimum="5" Maximum="120" Value="30" TickFrequency="5" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="TxtAutoReductInterval" Text="30s" Foreground="{StaticResource AccentColor}" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,-20,0,0" FontSize="12"/>
+                        <TextBlock x:Name="TxtAutoReductInterval" Text="30s" Foreground="{DynamicResource AccentColor}" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,-20,0,0" FontSize="12"/>
                     </Grid>
                 </StackPanel>
             </Border>
@@ -353,7 +316,7 @@
                 <Button Content="&#x1F4BE; SALVAR" 
                         Grid.Column="2"
                         Height="42" 
-                        Background="{StaticResource AccentColor}" 
+                        Background="{DynamicResource AccentColor}" 
                         Foreground="Black" 
                         FontWeight="Bold" 
                         FontSize="13"

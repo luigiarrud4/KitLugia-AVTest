@@ -3,7 +3,7 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="Adicionar ao Menu de Contexto"
-      Background="{StaticResource WindowBackground}"
+      Background="{DynamicResource WindowBackground}"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
     <Grid Margin="24,20,24,20">

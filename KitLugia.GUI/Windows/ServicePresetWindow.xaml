@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Consolas, Segoe UI Emoji"
         TextElement.Foreground="White"
-        Background="#0F0F0F"
+        Background="{DynamicResource Surface0}"
         ShowInTaskbar="False">
     <Window.Resources>
         <Style x:Key="WinButton" TargetType="Button">
@@ -137,7 +137,7 @@
                                         <CheckBox IsChecked="{Binding IsDisabled, Mode=TwoWay}" VerticalAlignment="Center"/>
                                         <Ellipse Grid.Column="1" Width="8" Height="8" Margin="9,0,0,0" VerticalAlignment="Center" Fill="{Binding LevelBrush}"/>
                                         <TextBlock Grid.Column="2" Text="{Binding Display}" FontSize="11.5" FontWeight="SemiBold" Foreground="White" Margin="9,0,0,0" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="3" Text="{Binding Reason}" FontSize="10.5" Foreground="#8A8A8A" Margin="10,0,8,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding Reason}" FontSize="10.5" Foreground="{DynamicResource TextMuted}" Margin="10,0,8,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                         <TextBlock Grid.Column="4" Text="{Binding StateText}" FontSize="9.5" FontWeight="Bold" Foreground="{Binding StateBrush}" VerticalAlignment="Center" Margin="4,0,2,0"/>
                                     </Grid>
                                 </Border>
@@ -154,7 +154,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="TxtFooterNote" Text="ℹ️ Passe o mouse sobre um serviço para ver a explicação completa (o porquê + o que quebra)." VerticalAlignment="Center" Foreground="#A0A0A0" FontSize="11" TextWrapping="Wrap"/>
+                <TextBlock x:Name="TxtFooterNote" Text="ℹ️ Passe o mouse sobre um serviço para ver a explicação completa (o porquê + o que quebra)." VerticalAlignment="Center" Foreground="{DynamicResource TextDescription}" FontSize="11" TextWrapping="Wrap"/>
                 <Button Grid.Column="1" Content="CANCELAR" Click="BtnCancel_Click" Style="{StaticResource WinButton}" Height="38" MinWidth="110" Margin="0,0,10,0"/>
                 <Button Grid.Column="2" Content="APLICAR SELEÇÃO" Click="BtnApply_Click" Style="{StaticResource ApplyButton}" MinWidth="180"/>
             </Grid>

@@ -7,7 +7,7 @@
       d:DesignHeight="600" d:DesignWidth="900"
       Title="rEFInd Boot Manager — KitLugia"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial"
-      Background="{StaticResource WindowBackground}">
+      Background="{DynamicResource WindowBackground}">
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -22,7 +22,7 @@
         </StackPanel>
 
         <!-- Main Content -->
-        <Border Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" Style="{StaticResource CardStyle}" Padding="25">
+        <Border Grid.Row="1" Background="{DynamicResource CardBackground}" CornerRadius="10" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" Style="{StaticResource CardStyle}" Padding="25">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -35,7 +35,7 @@
                     <StackPanel>
 
                         <!-- Status Card -->
-                        <Border x:Name="BdrStatus" Background="#1A2A1A" CornerRadius="8" Padding="15" Margin="0,0,0,15" BorderBrush="#4CAF50" BorderThickness="1">
+                        <Border x:Name="BdrStatus" Background="#1A2A1A" CornerRadius="8" Padding="15" Margin="0,0,0,15" BorderBrush="{DynamicResource SuccessBrush}" BorderThickness="1">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -66,46 +66,46 @@
                                 <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#B0B0B0" Margin="0,0,0,8">
 rEFInd v0.14.2 — fork do rEFIt por Roderick W. Smith. Substitui o Windows Boot Manager no ESP e oferece um menu gráfico para escolher o SO na inicializacao.
                                 </TextBlock>
-                                <Separator Background="#333" Margin="0,0,0,8"/>
+                                <Separator Background="{DynamicResource BorderSubtle}" Margin="0,0,0,8"/>
                                 <BulletDecorator Margin="0,0,0,4">
                                     <BulletDecorator.Bullet>
-                                        <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
+                                        <TextBlock Text="&#x2022;" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
                                     <TextBlock Text="Auto-detecção de EFI boot loaders em discos internos, externos e rede" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator Margin="0,0,0,4">
                                     <BulletDecorator.Bullet>
-                                        <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
+                                        <TextBlock Text="&#x2022;" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
                                     <TextBlock Text="Suporte a Secure Boot via Shim / MOK" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator Margin="0,0,0,4">
                                     <BulletDecorator.Bullet>
-                                        <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
+                                        <TextBlock Text="&#x2022;" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
                                     <TextBlock Text="Temas personalizados com icons PNG/JPEG/ICNS, banner e fontes escalaveis" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator Margin="0,0,0,4">
                                     <BulletDecorator.Bullet>
-                                        <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
+                                        <TextBlock Text="&#x2022;" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
                                     <TextBlock Text="Boot direto de kernels Linux com stub EFI + initramfs" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator Margin="0,0,0,4">
                                     <BulletDecorator.Bullet>
-                                        <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
+                                        <TextBlock Text="&#x2022;" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
                                     <TextBlock Text="Drivers EFI para ext4fs, Btrfs, NTFS, HFS+, ISO-9660" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator Margin="0,0,0,4">
                                     <BulletDecorator.Bullet>
-                                        <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
+                                        <TextBlock Text="&#x2022;" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
                                     <TextBlock Text="Boot de rede via iPXE (PXE/HTTP)" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
                                 <BulletDecorator>
                                     <BulletDecorator.Bullet>
-                                        <TextBlock Text="&#x2022;" Foreground="{StaticResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
+                                        <TextBlock Text="&#x2022;" Foreground="{DynamicResource AccentColor}" FontSize="12" Margin="0,0,4,0"/>
                                     </BulletDecorator.Bullet>
                                     <TextBlock Text="Timeout configurável, entrada padrão, protetor de tela" FontSize="11" Foreground="#CCC" TextWrapping="Wrap"/>
                                 </BulletDecorator>
@@ -113,7 +113,7 @@ rEFInd v0.14.2 — fork do rEFIt por Roderick W. Smith. Substitui o Windows Boot
                         </Border>
 
                         <!-- How it works -->
-                        <Border Background="#1A2A1A" CornerRadius="8" Padding="15" Margin="0,0,0,12" BorderBrush="#4CAF50" BorderThickness="1">
+                        <Border Background="#1A2A1A" CornerRadius="8" Padding="15" Margin="0,0,0,12" BorderBrush="{DynamicResource SuccessBrush}" BorderThickness="1">
                             <StackPanel>
                                 <TextBlock Text="&#x1F4CB; Como funciona" FontSize="13" FontWeight="Bold" Foreground="White" Margin="0,0,0,8"/>
                                 <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#B0B0B0" Margin="0,0,0,6">
@@ -146,7 +146,7 @@ rEFInd v0.14.2 — fork do rEFIt por Roderick W. Smith. Substitui o Windows Boot
                 </ScrollViewer>
 
                 <!-- RIGHT: Log -->
-                <Border Grid.Column="2" Background="#1A1A1A" CornerRadius="8" BorderBrush="#333" BorderThickness="1">
+                <Border Grid.Column="2" Background="{DynamicResource Surface1}" CornerRadius="8" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -166,7 +166,7 @@ rEFInd v0.14.2 — fork do rEFIt por Roderick W. Smith. Substitui o Windows Boot
 
         <!-- Bottom overlay with progress -->
         <Grid x:Name="OverlayBusy" Grid.RowSpan="2" Background="#CC000000" Visibility="Collapsed">
-            <Border Background="#1A1A1A" CornerRadius="10" BorderBrush="#333" BorderThickness="1"
+            <Border Background="{DynamicResource Surface1}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1"
                     Width="480" Padding="30" VerticalAlignment="Center" HorizontalAlignment="Center">
                 <StackPanel>
                     <TextBlock x:Name="TxtProgressIcon" Text="&#x23F3;" FontSize="40" HorizontalAlignment="Center"/>
@@ -175,7 +175,7 @@ rEFInd v0.14.2 — fork do rEFIt por Roderick W. Smith. Substitui o Windows Boot
                     <TextBlock x:Name="TxtProgressStep" Text="" FontSize="13" Foreground="#AAA"
                                HorizontalAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,15"/>
                     <ProgressBar x:Name="ProgressBar" Height="8" IsIndeterminate="True"
-                                 Foreground="{StaticResource AccentColor}" Background="#333" Margin="0,0,0,2"/>
+                                 Foreground="{DynamicResource AccentColor}" Background="{DynamicResource BorderSubtle}" Margin="0,0,0,2"/>
                     <Button x:Name="BtnCancelOp" Content="&#x274C; CANCELAR" Height="36" FontSize="12" FontWeight="Bold"
                             Style="{StaticResource DeleteButtonStyle}" Margin="0,5,0,0"
                             Click="BtnCancelOp_Click" HorizontalAlignment="Center" Width="160" Visibility="Collapsed"/>

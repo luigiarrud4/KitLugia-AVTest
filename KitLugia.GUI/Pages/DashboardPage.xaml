@@ -7,67 +7,6 @@
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial">
 
     <Page.Resources>
-        <ControlTemplate x:Key="GameBoostComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="36" />
-                </Grid.ColumnDefinitions>
-                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="5" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
-                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L5,5 L10,0" IsHitTestVisible="False"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Border" Property="Background" Value="#2A2A2A" />
-                    <Setter TargetName="Border" Property="BorderBrush" Value="#666666" />
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
-
-        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#222222"/>
-            <Setter Property="BorderBrush" Value="#444444"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Setter Property="OverridesDefaultStyle" Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ComboBox}">
-                        <Grid>
-                            <ToggleButton Name="ToggleButton" Template="{StaticResource GameBoostComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Cursor="Hand"/>
-                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
-                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide" StaysOpen="False">
-                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="#222222" BorderThickness="1" BorderBrush="#444444" CornerRadius="5"/>
-                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                    </ScrollViewer>
-                                </Grid>
-                            </Popup>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="#222"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="12,10"/>
-            <Setter Property="MinHeight" Value="36"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#333"/>
-                    <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
-                </Trigger>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#444"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
         <Style x:Key="InfoButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="18"/>
             <Setter Property="Height" Value="18"/>
@@ -101,12 +40,12 @@
             <StackPanel Margin="40,30,40,50" MaxWidth="850" HorizontalAlignment="Left">
 
                 <!-- T&#xCD;TULO -->
-                <TextBlock Text="Sistema" FontSize="36" FontWeight="SemiBold" Margin="0,0,0,25" Foreground="{StaticResource TextPrimary}"/>
+                <TextBlock Text="Sistema" FontSize="36" FontWeight="SemiBold" Margin="0,0,0,25" Foreground="{DynamicResource TextPrimary}"/>
 
                 <!-- BANNER INFORMATIVO (INFO PC) -->
                 <!-- Banner clicavel: unico card da pagina que anima no hover (escala 1,015 em 180 ms,
                      como o CardStyle animava antes da padronizacao, mais o realce de cor do tema). -->
-                <Border x:Name="BtnPcInfo" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25" Style="{StaticResource CardStyle}" Cursor="Hand" MouseLeftButtonDown="BtnPcInfo_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.015" controls:HoverZoom.DurationMs="180">
+                <Border x:Name="BtnPcInfo" Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25" Style="{StaticResource CardStyle}" Cursor="Hand" MouseLeftButtonDown="BtnPcInfo_Click" controls:HoverZoom.Enabled="True" controls:HoverZoom.Scale="1.015" controls:HoverZoom.DurationMs="180">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -119,15 +58,15 @@
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock x:Name="TxtPCName" Text="DESKTOP-NAME" FontSize="20" FontWeight="Bold"/>
-                            <TextBlock x:Name="TxtSpecs" Text="Carregando informa&#xE7;&#xF5;es..." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,3,0,0" TextWrapping="Wrap"/>
-                            <TextBlock Text="Kit Lugia - Ativo" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,3,0,0"/>
+                            <TextBlock x:Name="TxtSpecs" Text="Carregando informa&#xE7;&#xF5;es..." FontSize="13" Foreground="{DynamicResource TextMuted}" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="Kit Lugia - Ativo" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="0,3,0,0"/>
                         </StackPanel>
-                        <TextBlock Grid.Column="2" Text="&#x279C;" FontSize="24" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        <TextBlock Grid.Column="2" Text="&#x279C;" FontSize="24" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                     </Grid>
                 </Border>
 
                 <!-- === NOVA SE&#xC7;&#xC3;O: A&#xC7;&#xD5;ES DE 1-CLIQUE === -->
-                <TextBlock Text="Otimiza&#xE7;&#xE3;o Inteligente (1-Clique)" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,15" FontWeight="SemiBold"/>
+                <TextBlock Text="Otimiza&#xE7;&#xE3;o Inteligente (1-Clique)" FontSize="16" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,15" FontWeight="SemiBold"/>
 
                 <Grid Margin="0,0,0,30">
                     <Grid.ColumnDefinitions>
@@ -218,7 +157,7 @@
 
                 
                 <!-- === SE&#xC7;&#xC3;O: GAMING LATENCY PROFILE === -->
-                <TextBlock Text="Gaming Latency Profile (Baixa Lat&#xEA;ncia)" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,15" FontWeight="SemiBold"/>
+                <TextBlock Text="Gaming Latency Profile (Baixa Lat&#xEA;ncia)" FontSize="16" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,15" FontWeight="SemiBold"/>
 
                 <Grid Margin="0,0,0,30">
                     <Grid.ColumnDefinitions>
@@ -246,7 +185,7 @@
                                         <!-- Texto -->
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0">
                                             <TextBlock Text="GAMING LATENCY" FontWeight="Bold" Foreground="White" FontSize="13"/>
-                                            <TextBlock Text="Baixa Lat&#xEA;ncia" Foreground="#FFD700" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
+                                            <TextBlock Text="Baixa Lat&#xEA;ncia" Foreground="{DynamicResource AccentColor}" FontSize="12" FontWeight="Bold" Margin="0,2,0,0"/>
                                             <TextBlock Text="Otimiza DPC/ISR, timers e input para m&#xED;nima lat&#xEA;ncia." Foreground="#999" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
                                     </Grid>
@@ -307,10 +246,10 @@
                 </Grid>
                 
                 <!-- A LISTA DE CART&#xD5;ES (NAVEGA&#xC7;&#xC3;O COMPLETA) -->
-                <TextBlock Text="Gerenciamento do Sistema" FontSize="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,10" FontWeight="SemiBold"/>
+                <TextBlock Text="Gerenciamento do Sistema" FontSize="16" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,10" FontWeight="SemiBold"/>
 
                 <!-- OTIMIZACAO E PERFORMANCE -->
-                <TextBlock Text="Performance e Otimiza&#xE7;&#xE3;o" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,10,0,5" FontWeight="SemiBold"/>
+                <TextBlock Text="Performance e Otimiza&#xE7;&#xE3;o" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="0,10,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x26A1;" 
                     Content="Otimiza&#xE7;&#xF5;es Avan&#xE7;adas"
@@ -343,7 +282,7 @@
                     Click="BtnGoToExmTweaks_Click"/>
 
                 <!-- SISTEMA E REPAROS -->
-                <TextBlock Text="Sistema e Reparos" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+                <TextBlock Text="Sistema e Reparos" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F4C0;" 
                     Content="Kit ISO Editor"
@@ -391,7 +330,7 @@
                     Click="BtnGoToDrivers_Click"/>
 
                 <!-- REDE E INTERNET -->
-                <TextBlock Text="Rede e Conectividade" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+                <TextBlock Text="Rede e Conectividade" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F310;" 
                     Content="Otimizador de Rede (Ping)"
@@ -399,7 +338,7 @@
                     Click="BtnGoToNetwork_Click"/>
 
                 <!-- PRIVACIDADE E SEGURANCA -->
-                <TextBlock Text="Privacidade e Seguran&#xE7;a" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+                <TextBlock Text="Privacidade e Seguran&#xE7;a" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F512;" 
                     Content="Privacidade e Telemetria (O&amp;O ShutUp10)"
@@ -418,7 +357,7 @@
                     Click="BtnGoToIntegrity_Click"/>
 
                 <!-- ATIVACAO E CONFIGURACOES -->
-                <TextBlock Text="Ativa&#xE7;&#xE3;o e Configura&#xE7;&#xF5;es" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+                <TextBlock Text="Ativa&#xE7;&#xE3;o e Configura&#xE7;&#xF5;es" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F511;" 
                     Content="Microsoft Activation Scripts"
@@ -436,7 +375,7 @@
                     Click="BtnGoToUpdate_Click"/>
 
                 <!-- EXTRAS -->
-                <TextBlock Text="Extras" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+                <TextBlock Text="Extras" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F5A5;&#xFE0F;" 
                     Content="Tela e Cores (Screen)"
@@ -448,7 +387,7 @@
                     ToolTip="Gerenciar planos de energia, Bitsum Highest Performance e Ultimate Performance"
                     Click="BtnGoToPowerPlans_Click"/>
 
-                <TextBlock Text="Utilit&#xE1;rios" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+                <TextBlock Text="Utilit&#xE1;rios" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F3B5;" 
                     Content="WinTune Optimizations"
@@ -471,7 +410,7 @@
                     Click="BtnGoToReinstallPreserve_Click"/>
 
                 <!-- WINDOWS UPDATE (INSIDER) -->
-                <TextBlock Text="Windows Update (Insider)" FontSize="12" Foreground="{StaticResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+                <TextBlock Text="Windows Update (Insider)" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
 
                 <Button Style="{StaticResource SettingsCardStyle}" Tag="&#x1F504;"
                     Content="Windows Update (OfflineInsiderEnroll)"
@@ -484,7 +423,7 @@
         <!-- OVERLAY: MENU DE SELE&#xC7;&#xC3;O R&#xC1;PIDA -->
         <Grid x:Name="OverlayQuickMenu" Visibility="Collapsed" Background="#CC000000">
             <Border Width="820" VerticalAlignment="Center" HorizontalAlignment="Center" 
-                    Background="#1E1E1E" BorderBrush="#333" BorderThickness="1" CornerRadius="12" MaxHeight="680">
+                    Background="#1E1E1E" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="12" MaxHeight="680">
                 <Grid Margin="20">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -522,22 +461,20 @@
                                     <ComboBoxItem Content="4096 MB (4GB)" Foreground="White"/>
                                 </ComboBox>
 
-                                <Separator Background="#333" Margin="0,0,0,6"/>
+                                <Separator Background="{DynamicResource BorderSubtle}" Margin="0,0,0,6"/>
 
                                 <TextBlock Text="Motor do GameBoost:" Foreground="#AAA" FontSize="12" Margin="0,0,0,4"/>
                                  <ComboBox x:Name="CmbGameEngine" Height="28" Margin="0,0,0,8" SelectedIndex="0"
-                                           Style="{StaticResource DarkComboBoxStyle}"
-                                           ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
                                            SelectionChanged="CmbGameEngine_SelectionChanged"/>
 
-                                <Separator Background="#333" Margin="0,0,0,6"/>
+                                <Separator Background="{DynamicResource BorderSubtle}" Margin="0,0,0,6"/>
 
                                 <CheckBox x:Name="ChkExtremeVisuals" Content="Modo Extreme (Remover Anima&#xE7;&#xF5;es)" Foreground="White" Margin="0,0,0,6"/>
                                 <CheckBox x:Name="ChkPowerPlan" Content="Ativar Plano Bitsum Highest Performance" IsChecked="True" Foreground="White" Margin="0,0,0,6"/>
                                 <CheckBox x:Name="ChkTurboShutdown" Content="Desligamento Turbo (Shutdownturbo 2s)" IsChecked="True" Foreground="White" Margin="0,0,0,6"/>
                                 <CheckBox x:Name="ChkSystemTweaks" Content="Tweaks de Registro (Cache, Explorer, Bing)" IsChecked="True" Foreground="White" Margin="0,0,0,10"/>
 
-                                <Separator Background="#333" Margin="0,0,0,8"/>
+                                <Separator Background="{DynamicResource BorderSubtle}" Margin="0,0,0,8"/>
 
                                 <TextBlock Text="TWEAKS QUE INICIAM JUNTO COM O PC" Foreground="#FFD54F" FontSize="11" FontWeight="Bold" Margin="0,0,0,3"/>
                                 <TextBlock Text="Melhorias mantidas em segundo plano ap&#xF3;s otimiza&#xE7;&#xE3;o inicial." Foreground="#AAA" FontSize="11" Margin="0,0,0,6" TextWrapping="Wrap"/>
@@ -548,20 +485,20 @@
                         </ScrollViewer>
 
                         <!-- SEPARADOR VERTICAL -->
-                        <Border Grid.Column="1" Background="#333" Width="1"/>
+                        <Border Grid.Column="1" Background="{DynamicResource BorderSubtle}" Width="1"/>
 
                         <!-- ===== COLUNA DIREITA: OTIMIZA&#xC7;&#xC3;O DO CRIADOR ===== -->
                         <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Margin="8,0,0,0">
                             <StackPanel>
                                 <TextBlock Text="Otimiza&#xE7;&#xE3;o do Criador" FontSize="16" FontWeight="Bold" Foreground="#FFB74D" Margin="0,0,0,2"/>
-                                <TextBlock Text="Todas as configura&#xE7;&#xF5;es que eu uso no meu dia a dia." Foreground="#A0A0A0" FontSize="11" Margin="0,0,0,8"/>
+                                <TextBlock Text="Todas as configura&#xE7;&#xF5;es que eu uso no meu dia a dia." Foreground="{DynamicResource TextDescription}" FontSize="11" Margin="0,0,0,8"/>
 
                                 <Button x:Name="BtnAtivarTodosCriador" Content="&#x25B6; ATIVAR TODOS" Height="28" FontSize="11" FontWeight="Bold"
                                         Style="{StaticResource GoldButtonStyle}" Margin="0,0,0,10"
                                         Click="BtnAtivarTodosCriador_Click"/>
 
                                 <!-- ATIVADOS -->
-                                <TextBlock Text="Itens ATIVADOS" FontSize="13" FontWeight="Bold" Foreground="#4CAF50" Margin="0,0,0,6"/>
+                                <TextBlock Text="Itens ATIVADOS" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" Margin="0,0,0,6"/>
 
                                 <Grid Margin="0,0,0,3">
                                     <Grid.ColumnDefinitions>
@@ -812,14 +749,14 @@
         <!-- OVERLAY: GAMING LATENCY MENU -->
         <Grid x:Name="OverlayLatencyMenu" Visibility="Collapsed" Background="#CC000000">
             <Border Width="650" VerticalAlignment="Center" HorizontalAlignment="Center" 
-                    Background="#1E1E1E" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="12" MaxHeight="750">
+                    Background="#1E1E1E" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="12" MaxHeight="750">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="20">
-                    <TextBlock Text="Gaming Latency Profile" FontSize="20" FontWeight="Bold" Foreground="#FFD700" Margin="0,0,0,5"/>
+                    <TextBlock Text="Gaming Latency Profile" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,5"/>
                     <TextBlock Text="Otimize DPC/ISR, timers e input para lat&#xEA;ncia m&#xED;nima" FontSize="11" Foreground="#999" Margin="0,0,0,20"/>
 
                     <!-- LATENCY ANALYZER SECTION -->
-                    <Border Background="#2A2A2A" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="8" Padding="15" Margin="0,0,0,15">
+                    <Border Background="#2A2A2A" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="8" Padding="15" Margin="0,0,0,15">
                         <StackPanel>
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
@@ -827,7 +764,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="&#x1F4CA; An&#xE1;lise de Lat&#xEA;ncia" Foreground="#FFD700" FontSize="13" FontWeight="Bold"/>
+                                    <TextBlock Text="&#x1F4CA; An&#xE1;lise de Lat&#xEA;ncia" Foreground="{DynamicResource AccentColor}" FontSize="13" FontWeight="Bold"/>
                                     <TextBlock Text="Me&#xE7;a DPC/ISR e obtenha recomenda&#xE7;&#xF5;es" FontSize="11" Foreground="#888"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -849,21 +786,21 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <Border Grid.Column="0" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="0,0,4,0">
+                                    <Border Grid.Column="0" Background="{DynamicResource Surface1}" CornerRadius="4" Padding="8" Margin="0,0,4,0">
                                         <StackPanel>
                                             <TextBlock Text="M&#xC9;DIA" FontSize="11" Foreground="#666" HorizontalAlignment="Center"/>
-                                            <TextBlock x:Name="TxtLatencyAvg" Text="--" FontSize="16" Foreground="#4CAF50" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtLatencyAvg" Text="--" FontSize="16" Foreground="{DynamicResource SuccessBrush}" FontWeight="Bold" HorizontalAlignment="Center"/>
                                             <TextBlock Text="ms" FontSize="11" Foreground="#666" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Border>
-                                    <Border Grid.Column="1" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="2,0,2,0">
+                                    <Border Grid.Column="1" Background="{DynamicResource Surface1}" CornerRadius="4" Padding="8" Margin="2,0,2,0">
                                         <StackPanel>
                                             <TextBlock Text="P95" FontSize="11" Foreground="#666" HorizontalAlignment="Center"/>
-                                            <TextBlock x:Name="TxtLatencyP95" Text="--" FontSize="16" Foreground="#FFC107" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtLatencyP95" Text="--" FontSize="16" Foreground="{DynamicResource WarningBrush}" FontWeight="Bold" HorizontalAlignment="Center"/>
                                             <TextBlock Text="ms" FontSize="11" Foreground="#666" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Border>
-                                    <Border Grid.Column="2" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="4,0,0,0">
+                                    <Border Grid.Column="2" Background="{DynamicResource Surface1}" CornerRadius="4" Padding="8" Margin="4,0,0,0">
                                         <StackPanel>
                                             <TextBlock Text="M&#xC1;X" FontSize="11" Foreground="#666" HorizontalAlignment="Center"/>
                                             <TextBlock x:Name="TxtLatencyMax" Text="--" FontSize="16" Foreground="#FF5722" FontWeight="Bold" HorizontalAlignment="Center"/>
@@ -879,7 +816,7 @@
                                            TextWrapping="Wrap" Margin="0,0,0,8"/>
                                 
                                 <Button x:Name="BtnApplyRecommended" Content="APLICAR RECOMENDA&#xC7;&#xD5;ES" Height="32" 
-                                        Background="#4CAF50" Foreground="White" BorderThickness="0"
+                                        Background="{DynamicResource SuccessBrush}" Foreground="White" BorderThickness="0"
                                         Click="BtnApplyRecommended_Click" FontSize="11" FontWeight="Bold" Visibility="Collapsed"/>
 
                                 <TextBlock x:Name="TxtDriverReport" Text="" FontFamily="Consolas" FontSize="11" Foreground="#9CDCFE" 
@@ -888,7 +825,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Separator Background="#333" Margin="0,0,0,15"/>
+                    <Separator Background="{DynamicResource BorderSubtle}" Margin="0,0,0,15"/>
 
                     <!-- Win32PrioritySeparation SELETOR -->
                     <TextBlock Text="Win32PrioritySeparation (Scheduling):" Foreground="#AAA" FontSize="12" Margin="0,0,0,5" FontWeight="SemiBold"/>
@@ -900,13 +837,13 @@
                         <ComboBoxItem Content="0x2A (42) - M&#xE1;ximo Foreground (Avan&#xE7;ado)" Foreground="White"/>
                     </ComboBox>
 
-                    <Separator Background="#333" Margin="0,0,0,15"/>
+                    <Separator Background="{DynamicResource BorderSubtle}" Margin="0,0,0,15"/>
 
                     <!-- TWEAKS INDIVIDUAIS COM TOGGLES -->
                     <TextBlock Text="Tweaks Individuais (Toggle ON/OFF):" Foreground="#AAA" FontSize="12" Margin="0,0,0,10" FontWeight="SemiBold"/>
 
                     <!-- Core Parking Toggle -->
-                    <Border x:Name="BorderCoreParking" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                    <Border x:Name="BorderCoreParking" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -919,13 +856,13 @@
                                 <TextBlock Text="Mant&#xE9;m todos os cores CPU ativos" FontSize="11" Foreground="#888"/>
                             </StackPanel>
                             <Button x:Name="BtnToggleCoreParking" Grid.Column="2" Content="OFF" Height="26" Width="50" 
-                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Background="{DynamicResource BorderSubtle}" Foreground="#999" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1"
                                     Click="BtnToggleCoreParking_Click" FontSize="11" FontWeight="Bold"/>
                         </Grid>
                     </Border>
 
                     <!-- Timer Coalescing Toggle -->
-                    <Border x:Name="BorderTimerCoalescing" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                    <Border x:Name="BorderTimerCoalescing" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -938,13 +875,13 @@
                                 <TextBlock Text="Timers de alta precis&#xE3;o (melhor para jogos)" FontSize="11" Foreground="#888"/>
                             </StackPanel>
                             <Button x:Name="BtnToggleTimerCoalescing" Grid.Column="2" Content="OFF" Height="26" Width="50" 
-                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Background="{DynamicResource BorderSubtle}" Foreground="#999" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1"
                                     Click="BtnToggleTimerCoalescing_Click" FontSize="11" FontWeight="Bold"/>
                         </Grid>
                     </Border>
 
                     <!-- Input Queue Toggle -->
-                    <Border x:Name="BorderInputQueue" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                    <Border x:Name="BorderInputQueue" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -957,13 +894,13 @@
                                 <TextBlock Text="Aumenta buffer de mouse/teclado (30 vs 100)" FontSize="11" Foreground="#888"/>
                             </StackPanel>
                             <Button x:Name="BtnToggleInputQueue" Grid.Column="2" Content="OFF" Height="26" Width="50" 
-                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Background="{DynamicResource BorderSubtle}" Foreground="#999" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1"
                                     Click="BtnToggleInputQueue_Click" FontSize="11" FontWeight="Bold"/>
                         </Grid>
                     </Border>
 
                     <!-- Global Timer Toggle -->
-                    <Border x:Name="BorderGlobalTimer" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                    <Border x:Name="BorderGlobalTimer" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -976,13 +913,13 @@
                                 <TextBlock Text="Permite apps pedir timers precisos (1ms)" FontSize="11" Foreground="#888"/>
                             </StackPanel>
                             <Button x:Name="BtnToggleGlobalTimer" Grid.Column="2" Content="OFF" Height="26" Width="50" 
-                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Background="{DynamicResource BorderSubtle}" Foreground="#999" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1"
                                     Click="BtnToggleGlobalTimer_Click" FontSize="11" FontWeight="Bold"/>
                         </Grid>
                     </Border>
 
                     <!-- System Responsiveness Toggle -->
-                    <Border x:Name="BorderSysResp" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,15">
+                    <Border x:Name="BorderSysResp" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,15">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -995,12 +932,12 @@
                                 <TextBlock Text="0 = M&#xE1;xima performance (desativa background)" FontSize="11" Foreground="#888"/>
                             </StackPanel>
                             <Button x:Name="BtnToggleSysResp" Grid.Column="2" Content="OFF" Height="26" Width="50" 
-                                    Background="#333" Foreground="#999" BorderBrush="#555" BorderThickness="1"
+                                    Background="{DynamicResource BorderSubtle}" Foreground="#999" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1"
                                     Click="BtnToggleSysResp_Click" FontSize="11" FontWeight="Bold"/>
                         </Grid>
                     </Border>
 
-                    <Separator Background="#333" Margin="0,0,0,15"/>
+                    <Separator Background="{DynamicResource BorderSubtle}" Margin="0,0,0,15"/>
 
                     <!-- STATUS DOS TWEAKS -->
                     <TextBlock Text="Status Atual:" Foreground="#AAA" FontSize="11" Margin="0,0,0,8"/>
@@ -1027,21 +964,21 @@
         <!-- LOADING OVERLAY PARA BENCHMARK -->
         <Grid x:Name="LoadingOverlayBenchmark" Visibility="Collapsed" Background="#CC000000">
             <Border Width="450" VerticalAlignment="Center" HorizontalAlignment="Center" 
-                    Background="#1E1E1E" BorderBrush="#FFD700" BorderThickness="2" CornerRadius="12" Padding="30">
+                    Background="#1E1E1E" BorderBrush="{DynamicResource AccentColor}" BorderThickness="2" CornerRadius="12" Padding="30">
                 <StackPanel>
                     <!-- Spinner -->
                     <TextBlock Text="&#x23F3;" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,15"/>
                     
                     <!-- T&#xED;tulo -->
                     <TextBlock Text="BENCHMARK EM ANDAMENTO" FontSize="18" FontWeight="Bold" 
-                               Foreground="#FFD700" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                               Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,10"/>
                     
                     <!-- Descri&#xE7;&#xE3;o -->
                     <TextBlock Text="Testando m&#xFA;ltiplos perfis de performance..." FontSize="12" 
                                Foreground="#AAA" HorizontalAlignment="Center" Margin="0,0,0,20" TextWrapping="Wrap"/>
                     
                     <!-- Progress Bar -->
-                    <ProgressBar x:Name="ProgressBarBenchmark" Height="8" Background="#333" Foreground="#FFD700" 
+                    <ProgressBar x:Name="ProgressBarBenchmark" Height="8" Background="{DynamicResource BorderSubtle}" Foreground="{DynamicResource AccentColor}" 
                                 Minimum="0" Maximum="100" Value="0" Margin="0,0,0,15"/>
                     
                     <!-- Status Text -->
@@ -1052,7 +989,7 @@
                     <Border Background="#0A0A0A" CornerRadius="4" Padding="10" Margin="0,10,0,0" Height="120">
                         <ScrollViewer x:Name="ScrollViewerBenchmarkLog" VerticalScrollBarVisibility="Auto">
                             <TextBlock x:Name="TxtBenchmarkLog" Text="" FontSize="11" 
-                                       Foreground="#4CAF50" FontFamily="Consolas" TextWrapping="Wrap"/>
+                                       Foreground="{DynamicResource SuccessBrush}" FontFamily="Consolas" TextWrapping="Wrap"/>
                         </ScrollViewer>
                     </Border>
                     
@@ -1066,7 +1003,7 @@
         <!-- OVERLAY: INFO COMPLETA DO PC -->
         <Grid x:Name="OverlayPcInfo" Visibility="Collapsed" Background="#CC000000">
             <Border Width="700" VerticalAlignment="Center" HorizontalAlignment="Center"
-                    Background="#1E1E1E" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="12" MaxHeight="720">
+                    Background="#1E1E1E" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="12" MaxHeight="720">
                 <Grid Margin="20">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>

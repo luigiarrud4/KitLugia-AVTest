@@ -11,12 +11,12 @@
     </UserControl.Resources>
 
     <!-- Borda Principal (Altura Autom&#xE1;tica devido ao Grid interno) -->
-    <Border CornerRadius="12" BorderThickness="1" BorderBrush="{StaticResource AccentColor}" 
-            Background="#0F0F0F" Effect="{StaticResource GlowEffect}"
+    <Border CornerRadius="12" BorderThickness="1" BorderBrush="{DynamicResource AccentColor}" 
+            Background="{DynamicResource Surface0}" Effect="{StaticResource GlowEffect}"
             MinHeight="180">
         <!-- Altura M&#xED;nima para n&#xE3;o ficar muito pequeno -->
 
-        <Border CornerRadius="12" Background="{StaticResource WindowBackground}" ClipToBounds="True">
+        <Border CornerRadius="12" Background="{DynamicResource WindowBackground}" ClipToBounds="True">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="50"/>
@@ -29,7 +29,7 @@
 
                 <!-- 1. BARRA DE T&#xCD;TULO -->
                 <Border Grid.Row="0" Background="#15FFD700" BorderBrush="#33FFD700" BorderThickness="0,0,0,1">
-                    <TextBlock x:Name="TxtTitle" Text="AVISO DO SISTEMA" Foreground="{StaticResource AccentColor}" 
+                    <TextBlock x:Name="TxtTitle" Text="AVISO DO SISTEMA" Foreground="{DynamicResource AccentColor}" 
                                HorizontalAlignment="Center" VerticalAlignment="Center" 
                                FontWeight="Bold" FontSize="14" Effect="{StaticResource TextGlow}"/>
                 </Border>
@@ -40,8 +40,8 @@
                     <!-- &#xCD;cone Tri&#xE2;ngulo (Desenhado com propor&#xE7;&#xE3;o fixa para n&#xE3;o deformar) -->
                     <Grid HorizontalAlignment="Center" Margin="0,0,0,15" Width="44" Height="40">
                         <Path Data="M 22,0 L 44,40 L 0,40 Z" 
-                              Fill="{StaticResource AccentColor}" 
-                              Stroke="{StaticResource AccentColor}" 
+                              Fill="{DynamicResource AccentColor}" 
+                              Stroke="{DynamicResource AccentColor}" 
                               Stretch="Fill" 
                               Effect="{StaticResource TextGlow}" 
                               StrokeThickness="3" StrokeLineJoin="Round"/>
@@ -53,7 +53,7 @@
 
                     <!-- Texto da Mensagem -->
                     <TextBlock x:Name="TxtMessage" Text="Mensagem..." 
-                               Foreground="{StaticResource TextPrimary}" 
+                               Foreground="{DynamicResource TextPrimary}" 
                                TextWrapping="Wrap" FontSize="15" 
                                TextAlignment="Center" LineHeight="24"/>
                 </StackPanel>

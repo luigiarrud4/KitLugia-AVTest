@@ -13,50 +13,6 @@
         <converters:StarWidthConverter x:Key="StarWidthConverter"/>
         <converters:StringToColorConverter x:Key="StringToColorConverter"/>
 
-        <!-- ESTILO CORRIGIDO PARA COMBOBOX ESCURO -->
-        <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="30" />
-                </Grid.ColumnDefinitions>
-                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
-                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L4,4 L8,0" IsHitTestVisible="False"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Border" Property="Background" Value="#333333" />
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
-
-        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#1A1A1A"/>
-            <Setter Property="BorderBrush" Value="#444444"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Setter Property="OverridesDefaultStyle" Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ComboBox}">
-                        <Grid>
-                            <ToggleButton Name="ToggleButton" Template="{StaticResource ComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
-                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
-                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="#1A1A1A" BorderThickness="1" BorderBrush="#444444"/>
-                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                    </ScrollViewer>
-                                </Grid>
-                            </Popup>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <!-- ANIMAÇÕES CORRIGIDAS (Loop Suave) -->
         <Storyboard x:Key="LivePulseStoryboard">
             <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1.0" To="0.2" Duration="0:0:0.8" AutoReverse="True" RepeatBehavior="Forever" />
@@ -94,12 +50,12 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="GERENCIADOR DE PARTIÇÕES" FontSize="26" FontWeight="ExtraBold" Foreground="{StaticResource AccentColor}"/>
-                <TextBlock Text="Visualize e gerencie seus discos e volumes com facilidade e segurança." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,2,0,0"/>
+                <TextBlock Text="GERENCIADOR DE PARTIÇÕES" FontSize="26" FontWeight="ExtraBold" Foreground="{DynamicResource AccentColor}"/>
+                <TextBlock Text="Visualize e gerencie seus discos e volumes com facilidade e segurança." Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="0,2,0,0"/>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Content="🔃 ATUALIZAR" Click="BtnRefresh_Click" Style="{StaticResource SecondaryButtonStyle}" Width="120" Height="36" FontSize="12" Margin="0,0,8,0" FontWeight="Bold"/>
-                <Button Content="↩ Voltar" Click="BtnBack_Click" Style="{StaticResource SecondaryButtonStyle}" Width="85" Height="32" FontSize="12" BorderBrush="Transparent" Foreground="{StaticResource TextMuted}"/>
+                <Button Content="↩ Voltar" Click="BtnBack_Click" Style="{StaticResource SecondaryButtonStyle}" Width="85" Height="32" FontSize="12" BorderBrush="Transparent" Foreground="{DynamicResource TextMuted}"/>
             </StackPanel>
         </Grid>
 
@@ -125,8 +81,8 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="DISCO ATUAL:" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="11"/>
-                        <ComboBox x:Name="CmbDisk" Grid.Column="1" Width="380" Height="34" FontSize="13" Style="{StaticResource DarkComboBoxStyle}" SelectionChanged="CmbDisk_SelectionChanged"/>
+                        <TextBlock Text="DISCO ATUAL:" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="11"/>
+                        <ComboBox x:Name="CmbDisk" Grid.Column="1" Width="380" Height="34" FontSize="13" SelectionChanged="CmbDisk_SelectionChanged"/>
                         <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Orientation="Horizontal">
                            <Border x:Name="BdrLiveBadge" Background="#33FFD600" BorderBrush="#FFD600" BorderThickness="1" CornerRadius="4" Padding="6,2" Visibility="Collapsed" Margin="0,0,10,0">
                                <StackPanel Orientation="Horizontal">
@@ -156,25 +112,25 @@
                                    <TextBlock Text="MONITORAMENTO LIVE" Foreground="#FFD600" FontSize="11" FontWeight="Bold"/>
                                </StackPanel>
                            </Border>
-                           <TextBlock x:Name="TxtDiskInfo" Text="Select a disk..." Foreground="{StaticResource TextMuted}" FontSize="12"/>
+                           <TextBlock x:Name="TxtDiskInfo" Text="Select a disk..." Foreground="{DynamicResource TextMuted}" FontSize="12"/>
                         </StackPanel>
                     </Grid>
 
                     <!-- Partition Bar Map -->
-                    <Border Grid.Row="1" Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Height="75" ClipToBounds="True" Margin="0,5,0,12">
+                    <Border Grid.Row="1" Background="#0A0A0A" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="8" Height="75" ClipToBounds="True" Margin="0,5,0,12">
                         <Grid x:Name="PanelPartBar"/>
                     </Border>
 
                     <!-- Legend -->
                     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
                         <Border Width="12" Height="12" Background="#2962FF" CornerRadius="2" Margin="0,0,6,0"/>
-                        <TextBlock Text="Sistema" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,18,0"/>
+                        <TextBlock Text="Sistema" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,0,18,0"/>
                         <Border Width="12" Height="12" Background="#FFD600" CornerRadius="2" Margin="0,0,6,0"/>
-                        <TextBlock Text="Winboot" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,18,0"/>
+                        <TextBlock Text="Winboot" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,0,18,0"/>
                         <Border Width="12" Height="12" Background="#00C853" CornerRadius="2" Margin="0,0,6,0"/>
-                        <TextBlock Text="Dados" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,18,0"/>
+                        <TextBlock Text="Dados" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,0,18,0"/>
                         <Border Width="12" Height="12" Background="#37474F" CornerRadius="2" Margin="0,0,6,0"/>
-                        <TextBlock Text="Não Alocado" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock Text="Não Alocado" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -209,7 +165,7 @@
                         <DataGrid.Resources>
                             <Style TargetType="DataGridColumnHeader">
                                 <Setter Property="Background" Value="#111"/>
-                                <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
                                 <Setter Property="Padding" Value="12,10"/>
                                 <Setter Property="BorderThickness" Value="0,0,0,1"/>
                                 <Setter Property="BorderBrush" Value="#333"/>
@@ -227,7 +183,7 @@
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
                                                         <ContentPresenter Grid.Column="0" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
-                                                        <Path x:Name="SortArrow" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Width="8" Height="6" Margin="5,0,0,0" Stretch="Fill" Fill="{StaticResource AccentColor}" RenderTransformOrigin="0.5,0.5" Visibility="Collapsed" Data="M0,0 L10,0 L5,10 z"/>
+                                                        <Path x:Name="SortArrow" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Width="8" Height="6" Margin="5,0,0,0" Stretch="Fill" Fill="{DynamicResource AccentColor}" RenderTransformOrigin="0.5,0.5" Visibility="Collapsed" Data="M0,0 L10,0 L5,10 z"/>
                                                     </Grid>
                                                 </Border>
                                             </Grid>
@@ -308,7 +264,7 @@
                             <DataGridTextColumn Header="ESPAÇO LIVRE" Binding="{Binding FreeSpaceString, Mode=OneWay}" Width="120">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
                                         <Setter Property="VerticalAlignment" Value="Center"/>
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
@@ -322,12 +278,12 @@
                 <Border Grid.Column="1" Style="{StaticResource SubtleCardStyle}" Padding="15">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel>
-                            <TextBlock Text="AÇÕES" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,15"/>
+                            <TextBlock Text="AÇÕES" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,15"/>
                             
                             <!-- Monitoramento Automático -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                <CheckBox x:Name="ChkAutoRefresh" Content="Atualização automática (10s)" IsChecked="True" Foreground="{StaticResource TextPrimary}" FontSize="12"/>
-                                <TextBlock Text="🔄" FontSize="13" Margin="5,2,0,0" Foreground="{StaticResource AccentColor}"/>
+                                <CheckBox x:Name="ChkAutoRefresh" Content="Atualização automática (10s)" IsChecked="True" Foreground="{DynamicResource TextPrimary}" FontSize="12"/>
+                                <TextBlock Text="🔄" FontSize="13" Margin="5,2,0,0" Foreground="{DynamicResource AccentColor}"/>
                             </StackPanel>
                             
                             <!-- Partition Specific -->
@@ -344,7 +300,7 @@
                             <Separator Background="#222" Margin="0,5,0,15"/>
 
                             <!-- Disk Level -->
-                            <TextBlock Text="DISCO" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                            <TextBlock Text="DISCO" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,10"/>
                             <Button x:Name="BtnCleanDisk" Content="🧹 LIMPAR DISCO" Click="BtnCleanDisk_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36" BorderBrush="#44FF0000" Foreground="#FFFF5555"/>
                             <Button x:Name="BtnConvert" Content="🔄 CONVERTER GPT/MBR" Click="BtnConvert_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36"/>
                             <Button x:Name="BtnDiskDetail" Content="📄 DETALHES DO DISCO" Click="BtnDiskDetail_Click" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,15" Height="36"/>
@@ -352,7 +308,7 @@
                             <Separator Background="#222" Margin="0,5,0,15"/>
 
                             <!-- ═══ DIAGNÓSTICO DE SHRINK (somente leitura) ═══ -->
-                            <TextBlock Text="ANÁLISE DE SHRINK" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,8"/>
+                            <TextBlock Text="ANÁLISE DE SHRINK" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,8"/>
                             <Button x:Name="BtnShrinkDiag" Content="🔍 DIAGNOSTICAR BLOQUEIO" Click="BtnShrinkDiag_Click"
                                     Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36"
                                     ToolTip="Descobre qual arquivo impede o shrink. Somente leitura — não altera nada."/>
@@ -363,7 +319,7 @@
                                     Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,12" Height="36" IsEnabled="False"/>
 
                             <!-- DEEP SHRINK (metodo hop) -->
-                            <TextBlock Text="DEEP SHRINK" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,8"/>
+                            <TextBlock Text="DEEP SHRINK" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,8"/>
                             <Button x:Name="BtnDeepShrink" Content="&#x26A0; DEEP SHRINK (1 REBOOT)" Click="BtnDeepShrink_Click"
                                     Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,8" Height="36"
                                     BorderBrush="#44FF8800" Foreground="#FFFFAA55"
@@ -383,7 +339,7 @@
                             </Border>
 
                             <!-- LAB HOP (teste em VM) -->
-                            <TextBlock Text="LAB HOP (VM)" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,8"/>
+                            <TextBlock Text="LAB HOP (VM)" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,8"/>
                             <Button x:Name="BtnHopDiag" Content="1 DIAGNOSTICAR" Click="BtnHopDiag_Click"
                                     Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,0,6" Height="32"
                                     ToolTip="Evento 259: qual arquivo bloqueia. S&#243; leitura."/>
@@ -427,9 +383,9 @@
 
                             <Border Background="#11D4AF37" BorderBrush="#33D4AF37" BorderThickness="1" CornerRadius="8" Padding="12">
                                 <StackPanel>
-                                    <TextBlock Text="💡 Dica de Segurança" Foreground="{StaticResource AccentColor}" FontWeight="Bold" FontSize="12" Margin="0,0,0,4"/>
+                                    <TextBlock Text="💡 Dica de Segurança" Foreground="{DynamicResource AccentColor}" FontWeight="Bold" FontSize="12" Margin="0,0,0,4"/>
                                     <TextBlock Text="Partições críticas (C:, EFI, Recuperação) são protegidas contra formatação e exclusão acidental." 
-                                              Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap"/>
+                                              Foreground="{DynamicResource TextMuted}" FontSize="11" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -448,7 +404,7 @@
 
         <!-- ═══ ACTION OVERLAY (EaseUS Style) ═══ -->
         <Grid x:Name="OverlayAction" Grid.RowSpan="3" Background="#EE000000" Visibility="Collapsed" Margin="-25,-20,-25,-15">
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="15" 
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="15" 
                     Width="600" MaxHeight="550" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30" Effect="{DynamicResource DropShadowEffect}">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -458,7 +414,7 @@
                     </Grid.RowDefinitions>
 
                     <!-- Title -->
-                    <TextBlock Grid.Row="0" x:Name="TxtOpTitle" Text="EXECUTANDO OPERAÇÃO" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10" HorizontalAlignment="Center"/>
+                    <TextBlock Grid.Row="0" x:Name="TxtOpTitle" Text="EXECUTANDO OPERAÇÃO" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,10" HorizontalAlignment="Center"/>
                     
                     <!-- Scrollable Content Area -->
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" MaxHeight="380" Margin="0,0,0,15">
@@ -467,12 +423,12 @@
                         
                             <!-- Progress Section -->
                             <Grid x:Name="PanelProgress" Margin="0,0,0,15">
-                                <ProgressBar x:Name="ProgOp" IsIndeterminate="True" Height="6" Foreground="{StaticResource AccentColor}" Background="#1A1A1A" BorderThickness="0" Minimum="0" Maximum="100"/>
+                                <ProgressBar x:Name="ProgOp" IsIndeterminate="True" Height="6" Foreground="{DynamicResource AccentColor}" Background="{DynamicResource Surface1}" BorderThickness="0" Minimum="0" Maximum="100"/>
                             </Grid>
 
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
                                 <!-- Rotating Processing Icon -->
-                                <TextBlock Text="⚙️" Foreground="{StaticResource AccentColor}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" RenderTransformOrigin="0.5,0.5">
+                                <TextBlock Text="⚙️" Foreground="{DynamicResource AccentColor}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" RenderTransformOrigin="0.5,0.5">
                                     <TextBlock.RenderTransform>
                                         <RotateTransform x:Name="RotationTransform" Angle="0"/>
                                     </TextBlock.RenderTransform>
@@ -481,7 +437,7 @@
                                              só gira enquanto o overlay de operação está aberto -->
                                     </TextBlock.Triggers>
                                 </TextBlock>
-                                <TextBlock x:Name="TxtOpStatus" Text="Status: Processando..." Foreground="{StaticResource TextMuted}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="TxtOpStatus" Text="Status: Processando..." Foreground="{DynamicResource TextMuted}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"/>
                             </StackPanel>
 
                             <!-- Safety Warning -->
@@ -526,7 +482,7 @@
                                 </Style>
                             </Ellipse.Style>
                         </Ellipse>
-                        <TextBlock x:Name="TxtLiveActivity" Text="..." Foreground="{StaticResource TextMuted}" FontSize="11" FontFamily="Consolas" 
+                        <TextBlock x:Name="TxtLiveActivity" Text="..." Foreground="{DynamicResource TextMuted}" FontSize="11" FontFamily="Consolas" 
                                    VerticalAlignment="Center" Opacity="0.5" TextTrimming="CharacterEllipsis" MaxWidth="350"/>
                     </StackPanel>
                 </Grid>
@@ -535,10 +491,10 @@
 
         <!-- ═══ INPUT OVERLAY (Integrated Dialog) ═══ -->
         <Grid x:Name="OverlayInput" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed" Margin="-25,-20,-25,-15">
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="15" 
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="15" 
                     Width="420" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="25" Effect="{StaticResource DropShadowEffect}">
                 <StackPanel>
-                    <TextBlock x:Name="TxtInputTitle" Text="ENTRADA DE DADOS" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
+                    <TextBlock x:Name="TxtInputTitle" Text="ENTRADA DE DADOS" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,10"/>
                     <TextBlock x:Name="TxtInputMessage" Text="Por favor, insira o valor desejado:" Foreground="White" FontSize="13" Margin="0,0,0,20" TextWrapping="Wrap"/>
                     
                     <TextBox x:Name="TxtInputField" Style="{StaticResource DarkTextBoxStyle}" FontSize="16" Padding="12,10" Margin="0,0,0,25" KeyDown="TxtInputField_KeyDown"/>
@@ -553,31 +509,31 @@
 
         <!-- ═══ EXTEND OVERLAY (EaseUS Style) ═══ -->
         <Grid x:Name="OverlayExtend" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed" Margin="-25,-20,-25,-15">
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="15" 
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="15" 
                     Width="480" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="25" Effect="{StaticResource DropShadowEffect}">
                 <StackPanel>
-                    <TextBlock x:Name="TxtExtendTitle" Text="ESTENDER VOLUME" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
+                    <TextBlock x:Name="TxtExtendTitle" Text="ESTENDER VOLUME" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,10"/>
                     
                     <Border Background="#11D4AF37" BorderThickness="0,0,0,1" BorderBrush="#33D4AF37" Padding="0,0,0,15" Margin="0,0,0,20">
                         <StackPanel>
-                            <TextBlock Text="Selecione de onde deseja extrair espaço para crescer esta partição." Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                            <TextBlock Text="Selecione de onde deseja extrair espaço para crescer esta partição." Foreground="{DynamicResource TextMuted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"/>
                             <StackPanel x:Name="PanelExtendSources">
                                 <RadioButton x:Name="RadioUnallocatedRight" Content="Espaço Não Alocado Adjacente" Foreground="White" IsChecked="True" GroupName="ExtendSource"/>
                                 <RadioButton x:Name="RadioNeighborRight" Content="Puxar da Partição Vizinha" Foreground="White" GroupName="ExtendSource" Margin="0,8,0,0"/>
-                                <CheckBox x:Name="ChkMergeMode" Content="Mesclar vizinha (DISM)" Foreground="{StaticResource AccentColor}" Margin="20,10,0,0" Visibility="Collapsed" IsChecked="False" ToolTip="Engine principal: DISM Imaging (tolerante a arquivos em uso / limitações do Windows). Fallback automático: Robocopy /B."/>
+                                <CheckBox x:Name="ChkMergeMode" Content="Mesclar vizinha (DISM)" Foreground="{DynamicResource AccentColor}" Margin="20,10,0,0" Visibility="Collapsed" IsChecked="False" ToolTip="Engine principal: DISM Imaging (tolerante a arquivos em uso / limitações do Windows). Fallback automático: Robocopy /B."/>
                             </StackPanel>
                             <TextBlock x:Name="TxtExtendWarning" Text="⚠️ Aviso" Foreground="#FFA500" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,0" Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
 
-                    <TextBlock Text="VALOR A ADICIONAR:" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                    <TextBlock Text="VALOR A ADICIONAR:" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,10"/>
                     <Grid Margin="0,0,0,20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="TxtExtendMb" Style="{StaticResource DarkTextBoxStyle}" FontSize="16" Padding="12,10" Text="0"/>
-                        <TextBlock Grid.Column="1" Text="MB" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock Grid.Column="1" Text="MB" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{DynamicResource TextMuted}"/>
                     </Grid>
 
                     <!-- Predefined Buttons -->
@@ -598,27 +554,27 @@
 
         <!-- ═══ SHRINK OVERLAY (EaseUS Style) ═══ -->
         <Grid x:Name="OverlayShrink" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed" Margin="-25,-20,-25,-15">
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="15" 
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="15" 
                     Width="450" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="25" Effect="{StaticResource DropShadowEffect}">
                 <StackPanel>
-                    <TextBlock x:Name="TxtShrinkTitle" Text="REDUZIR TAMANHO" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentColor}" Margin="0,0,0,10"/>
+                    <TextBlock x:Name="TxtShrinkTitle" Text="REDUZIR TAMANHO" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentColor}" Margin="0,0,0,10"/>
                     
                     <Border Background="#11D4AF37" BorderThickness="0,0,0,1" BorderBrush="#33D4AF37" Padding="0,0,0,15" Margin="0,0,0,20">
                         <StackPanel>
-                            <TextBlock Text="A partição será reduzida, liberando espaço não alocado no final." Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                            <TextBlock Text="A partição será reduzida, liberando espaço não alocado no final." Foreground="{DynamicResource TextMuted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"/>
                             <TextBlock x:Name="TxtMaxShrinkInfo" Text="Máximo reduzível: 0 MB" Foreground="White" FontSize="13" FontWeight="SemiBold"/>
                             <TextBlock x:Name="TxtShrinkWarning" Text="⚠️ Mesmo offline, DiskPart tem limitações (tamanho mínimo do volume). Use valores conservadores." Foreground="#FFA500" FontSize="11" TextWrapping="Wrap" Margin="0,5,0,0" Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
 
-                    <TextBlock Text="QUANTIDADE A RETIRAR:" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                    <TextBlock Text="QUANTIDADE A RETIRAR:" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,10"/>
                     <Grid Margin="0,0,0,20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="TxtShrinkMb" Style="{StaticResource DarkTextBoxStyle}" FontSize="16" Padding="12,10" Text="0"/>
-                        <TextBlock Grid.Column="1" Text="MB" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock Grid.Column="1" Text="MB" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{DynamicResource TextMuted}"/>
                     </Grid>
 
                     <!-- Predefined Buttons -->
@@ -635,7 +591,7 @@
                             <CheckBox x:Name="ChkEmergencyPreBoot" Content="🚨 Emergency Pre-Boot (WinRE + DISM)"
                                       Foreground="#FFFF5555" FontWeight="Bold" FontSize="13" Margin="0,0,0,8" Checked="ChkEmergencyPreBoot_Checked" Unchecked="ChkEmergencyPreBoot_Unchecked"/>
                             <TextBlock x:Name="TxtEmergencyWarning" Text="Usa WinRE modificado via DISM para reduzir sem as limitações do Windows. ⚠️ O sistema será REINICIADO automaticamente."
-                                      Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="20,0,0,0" Visibility="Collapsed"/>
+                                      Foreground="{DynamicResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="20,0,0,0" Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
 

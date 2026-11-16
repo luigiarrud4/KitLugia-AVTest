@@ -49,67 +49,6 @@
             <MenuItem Header="🗑️ Deletar App Portátil" Click="MenuPortableRemove_Click"/>
         </ContextMenu>
 
-        <!-- Estilo para combos escuros desta pagina (ordenacao) -->
-        <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="30" />
-                </Grid.ColumnDefinitions>
-                <Border x:Name="Border" Grid.ColumnSpan="2" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
-                <Path x:Name="Arrow" Grid.Column="1" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M0,0 L4,4 L8,0" IsHitTestVisible="False"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Border" Property="Background" Value="#333333" />
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
-
-        <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#1A1A1A"/>
-            <Setter Property="BorderBrush" Value="#444444"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Setter Property="OverridesDefaultStyle" Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ComboBox}">
-                        <Grid>
-                            <ToggleButton Name="ToggleButton" Template="{DynamicResource ComboBoxToggleButton}" Grid.Column="2" Focusable="false" IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
-                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
-                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="#1A1A1A" BorderThickness="1" BorderBrush="#444444"/>
-                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                    </ScrollViewer>
-                                </Grid>
-                            </Popup>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="#222"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="12,9"/>
-            <Setter Property="MinHeight" Value="34"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#333"/>
-                    <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
-                </Trigger>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#444"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
     <local:WidthMinusConverter x:Key="WidthMinusConverter"/>
 
         <!-- Estilo padrão para botões desta página (remove o chrome azul do WPF) -->
@@ -150,7 +89,7 @@
         <!-- Estilo TabItem similar ao ServicesPage -->
         <Style TargetType="TabItem">
             <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Padding" Value="15,10"/>
             <Setter Property="Template">
@@ -197,7 +136,7 @@
                         <StackPanel Grid.Row="0" Margin="0,0,0,15">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Removedor de Bloatware" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
-                                <TextBlock x:Name="BloatwareIconProgressText" Text="&#xCD;cones carregados: 0/0" FontSize="12" Foreground="#FFD700" Margin="15,5,0,0" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="BloatwareIconProgressText" Text="&#xCD;cones carregados: 0/0" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="15,5,0,0" FontWeight="SemiBold"/>
                             </StackPanel>
                             <TextBlock Text="Aplicativos nativos do Windows. Gerencie instala&#xE7;&#xF5;es padr&#xE3;o." Foreground="#AAA" Margin="0,3,0,0"/>
                             <TextBox x:Name="TxtSearchBloatware" TextChanged="TxtSearchBloatware_TextChanged"
@@ -205,15 +144,9 @@
                                      Margin="0,10,0,0"/>
                         </StackPanel>
 
-                        <Border x:Name="BloatwareLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" x:Name="BloatwareSpinnerHost">
-                                <ContentControl x:Name="BloatwareSpinner" Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Analisando..." Foreground="White" FontSize="16" Margin="0,15,0,0"/>
-                                <TextBlock x:Name="TxtBloatwareProgress" Foreground="#FFD700" FontSize="12" Margin="0,5,0,0" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
+                        <controls:AreaLoadingOverlay x:Name="BloatwareLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Visibility="Visible" Message="Analisando..."/>
 
-                        <Border Grid.Row="1" Background="#181818" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Padding="10">
+                        <Border Grid.Row="1" Background="#181818" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="10">
                             <ListView x:Name="BloatwareList" Background="Transparent" BorderThickness="0" Foreground="White" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
@@ -303,9 +236,9 @@
                         <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Orientation="Horizontal" Margin="0,15,0,0">
                             <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconSelectAll}" Content="Selecionar Todos" Foreground="#66BB6A" Background="#1F4CAF50" BorderBrush="#4D4CAF50" Click="BtnSelectAllBloatware_Click" Height="32" Margin="0,0,10,8"/>
                             <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconClearSelection}" Content="Limpar Seleção" Foreground="#B9B9B9" Click="BtnDeselectAllBloatware_Click" Height="32" Margin="0,0,10,8"/>
-                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRemove}" Content="Remover Selecionados" Foreground="#FFFFFF" Background="#C42B1C" BorderBrush="#E04A38" Click="BtnRemoveBloatwareSelected_Click" Height="32" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRemove}" Content="Remover Selecionados" Foreground="#FFFFFF" Background="{DynamicResource ErrorBrush}" BorderBrush="#E04A38" Click="BtnRemoveBloatwareSelected_Click" Height="32" Margin="0,0,10,8"/>
                             <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRestorePoint}" Content="Ponto de Restauração" Foreground="#64B5F6" Background="#1F2196F3" BorderBrush="#4D2196F3" Click="BtnCreateRestorePoint_Click" Height="32" Margin="0,0,10,8"/>
-                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconHunter}" Content="Hunter" Foreground="#FFD700" Background="#1FFFD700" BorderBrush="#4DFFD700" Click="BtnHunterMode_Click" Height="32" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconHunter}" Content="Hunter" Foreground="{DynamicResource AccentColor}" Background="#1FFFD700" BorderBrush="#4DFFD700" Click="BtnHunterMode_Click" Height="32" Margin="0,0,10,8"/>
                             <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRefresh}" Content="Atualizar Lista" Foreground="#D6D6D6" Click="BtnRefreshBloatware_Click" Height="32" Margin="0,0,0,8"/>
                         </WrapPanel>
                     </Grid>
@@ -329,7 +262,7 @@
                             <StackPanel Grid.Column="0">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Gerenciador de Programas" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
-                                    <TextBlock x:Name="ProgramsIconProgressText" Text="&#xCD;cones carregados: 0/0" FontSize="12" Foreground="#FFD700" Margin="15,5,0,0" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="ProgramsIconProgressText" Text="&#xCD;cones carregados: 0/0" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="15,5,0,0" FontWeight="SemiBold"/>
                                 </StackPanel>
                                 <TextBlock Text="Programas instalados no Windows. Gerencie instala&#xE7;&#xF5;es normais." Foreground="#AAA" Margin="0,3,0,0"/>
                                 <TextBlock Text="Baseado em Bulk Crap Uninstaller (BCU) - Licen&#xE7;a Apache 2.0" Foreground="#FF6F61" FontSize="11" Margin="0,2,0,0"/>
@@ -339,11 +272,9 @@
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="16,0,0,0">
-                                <TextBlock Text="ORDENAR POR" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"
+                                <TextBlock Text="ORDENAR POR" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextMuted}"
                                            HorizontalAlignment="Right" Margin="0,0,2,4"/>
                                 <ComboBox x:Name="CmbProgramSort" Height="34" Width="230"
-                                          Style="{StaticResource DarkComboBoxStyle}"
-                                          ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
                                           SelectionChanged="CmbProgramSort_SelectionChanged">
                                     <ComboBoxItem Tag="Registry" IsSelected="True">Padrão (ordem do registro)</ComboBoxItem>
                                     <ComboBoxItem Tag="NameAsc">Nome (A → Z)</ComboBoxItem>
@@ -359,15 +290,9 @@
                             </StackPanel>
                         </Grid>
 
-                        <Border x:Name="ProgramsLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <ContentControl Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Carregando programas..." Foreground="White" FontSize="16" Margin="0,15,0,0"/>
-                                <TextBlock x:Name="TxtProgramsProgress" Foreground="#FFD700" FontSize="12" Margin="0,5,0,0" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
+                        <controls:AreaLoadingOverlay x:Name="ProgramsLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Visibility="Visible" Message="Carregando programas..."/>
 
-                        <Border Grid.Row="1" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Padding="10">
+                        <Border Grid.Row="1" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="10">
                             <Grid>
                             <ListView x:Name="ProgramsList" Background="Transparent" BorderThickness="0"
                                       VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
@@ -442,7 +367,7 @@
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}"/>
                                                 <TextBlock Text="{Binding Publisher}" FontSize="11" Foreground="#666" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" ToolTip="{Binding Publisher}"/>
                                             </StackPanel>
-                                            <TextBlock Grid.Column="4" Text="{Binding DisplayVersion}" FontSize="11" Foreground="#555" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding DisplayVersion}" FontSize="11" Foreground="{DynamicResource BorderStrong}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                             <Button Grid.Column="5" Height="28" FontSize="11" Cursor="Hand" Click="BtnProgramRemove_Click" Tag="{Binding}" Content="REMOVER">
                                                 <Button.Style>
                                                     <Style TargetType="Button">
@@ -482,7 +407,7 @@
                         <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Orientation="Horizontal" Margin="0,15,0,0">
                             <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconSelectAll}" Content="Selecionar Todos" Foreground="#66BB6A" Background="#1F4CAF50" BorderBrush="#4D4CAF50" Click="BtnSelectAllPrograms_Click" Height="32" Margin="0,0,10,8"/>
                             <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconClearSelection}" Content="Limpar Seleção" Foreground="#B9B9B9" Click="BtnDeselectAllPrograms_Click" Height="32" Margin="0,0,10,8"/>
-                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRemove}" Content="Remover Selecionados" Foreground="#FFFFFF" Background="#C42B1C" BorderBrush="#E04A38" Click="BtnRemoveProgramsSelected_Click" Height="32" Margin="0,0,10,8"/>
+                            <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRemove}" Content="Remover Selecionados" Foreground="#FFFFFF" Background="{DynamicResource ErrorBrush}" BorderBrush="#E04A38" Click="BtnRemoveProgramsSelected_Click" Height="32" Margin="0,0,10,8"/>
                             <Button Style="{StaticResource IconTextButtonStyle}" Tag="{DynamicResource IconRestorePoint}" Content="Ponto de Restauração" Foreground="#64B5F6" Background="#1F2196F3" BorderBrush="#4D2196F3" Click="BtnCreateRestorePoint_Click" Height="32" Margin="0,0,10,8"/>
                             <Button Style="{StaticResource SecondaryButtonStyle}" Content="&#x2699;&#xFE0F; Config" Click="BtnDeepUninstallSettings_Click" Height="32" MinWidth="80" Margin="0,0,10,8"
                                     ToolTip="Configurações do desinstalador (Lixeira, matar processos, scan, seleção padrão, ignorar 24h)"/>
@@ -510,7 +435,7 @@
                             <StackPanel Grid.Column="0">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Aplicativos Portáteis Detectados" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
-                                    <TextBlock x:Name="PortableIconProgressText" Text="" FontSize="12" Foreground="#FFD700" Margin="15,5,0,0" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="PortableIconProgressText" Text="" FontSize="12" Foreground="{DynamicResource AccentColor}" Margin="15,5,0,0" FontWeight="SemiBold"/>
                                 </StackPanel>
                                 <TextBlock Text="Apps em pastas locais sem registro no Windows. Podem ser removidos manualmente." Foreground="#AAA" Margin="0,3,0,0"/>
                                 <TextBox x:Name="TxtSearchPortable" TextChanged="TxtSearchPortable_TextChanged"
@@ -518,11 +443,9 @@
                                          Margin="0,10,0,0"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="16,0,0,0">
-                                <TextBlock Text="ORDENAR POR" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"
+                                <TextBlock Text="ORDENAR POR" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextMuted}"
                                            HorizontalAlignment="Right" Margin="0,0,2,4"/>
                                 <ComboBox x:Name="CmbPortableSort" Height="34" Width="200"
-                                          Style="{StaticResource DarkComboBoxStyle}"
-                                          ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
                                           SelectionChanged="CmbPortableSort_SelectionChanged">
                                     <ComboBoxItem Tag="Default" IsSelected="True">Padrão (confiança)</ComboBoxItem>
                                     <ComboBoxItem Tag="NameAsc">Nome (A → Z)</ComboBoxItem>
@@ -537,15 +460,9 @@
                             </StackPanel>
                         </Grid>
 
-                        <Border x:Name="PortableLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Background="#CC000000" Visibility="Visible" CornerRadius="8">
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <ContentControl Template="{StaticResource Win11SpinnerTemplate}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Vasculhando pastas..." Foreground="White" FontSize="16" Margin="0,15,0,0"/>
-                                <TextBlock x:Name="TxtPortableProgress" Foreground="#FFD700" FontSize="12" Margin="0,5,0,0" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
+                        <controls:AreaLoadingOverlay x:Name="PortableLoadingPanel" Grid.Row="1" Panel.ZIndex="99" Visibility="Visible" Message="Vasculhando pastas..."/>
 
-                        <Border Grid.Row="1" Background="#252525" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Padding="10">
+                        <Border Grid.Row="1" Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="10">
                             <ListView x:Name="PortableList" Background="Transparent" BorderThickness="0"
                                       VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
                                 <ListView.ItemContainerStyle>
@@ -601,8 +518,8 @@
                                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>
                                                 <TextBlock Text="{Binding FolderPath}" FontSize="11" Foreground="#666" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
                                             </StackPanel>
-                                            <TextBlock Grid.Column="3" Text="{Binding TotalSizeFormatted}" FontSize="11" Foreground="#555" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="4" Text="{Binding ConfidenceLabel}" FontSize="11" Foreground="#555" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding TotalSizeFormatted}" FontSize="11" Foreground="{DynamicResource BorderStrong}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding ConfidenceLabel}" FontSize="11" Foreground="{DynamicResource BorderStrong}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                             <Button Grid.Column="5" Height="28" FontSize="11" Cursor="Hand" Click="BtnPortableRemove_Click" Tag="{Binding}" Content="DELETAR">
                                                 <Button.Style>
                                                     <Style TargetType="Button">
@@ -658,7 +575,7 @@
                             <StackPanel>
                                 <Border x:Name="JunkSection" Margin="0,0,0,0" Visibility="Collapsed">
                                     <StackPanel>
-                                        <Border Background="#252525" CornerRadius="5" Padding="12,8" Margin="0,0,0,10">
+                                        <Border Background="{DynamicResource Surface2}" CornerRadius="5" Padding="12,8" Margin="0,0,0,10">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
@@ -669,7 +586,7 @@
                                                 <TextBlock x:Name="TxtMaxCleanupInfo" Text="Carregando..." FontSize="12" Foreground="#888" VerticalAlignment="Center"/>
                                                 <Button Grid.Column="1" Content="Selecionar Todos" Height="30" Padding="10,0" Background="#2C3E50" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" Margin="0,0,6,0" Click="BtnMaxSelectAll_Click"/>
                                                 <Button Grid.Column="2" x:Name="BtnMaxClean" Content="&#x1F5D1; Limpar Selecionados (0)" Height="30" Padding="14,0" Background="#C0392B" Foreground="White" BorderThickness="0" FontSize="11" FontWeight="SemiBold" Cursor="Hand" IsEnabled="False" Click="BtnMaxClean_Click"/>
-                                                <Button Grid.Column="3" Content="Atualizar" Height="30" Padding="10,0" Background="#333" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" Margin="6,0,0,0" Click="BtnMaxRefresh_Click"/>
+                                                <Button Grid.Column="3" Content="Atualizar" Height="30" Padding="10,0" Background="{DynamicResource BorderSubtle}" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" Margin="6,0,0,0" Click="BtnMaxRefresh_Click"/>
                                             </Grid>
                                         </Border>
                                         <ItemsControl x:Name="JunkItemsList" Background="Transparent" BorderThickness="0">
@@ -692,19 +609,19 @@
                                                                         <ColumnDefinition Width="Auto"/>
                                                                         <ColumnDefinition Width="Auto"/>
                                                                     </Grid.ColumnDefinitions>
-                                                                    <TextBlock Grid.Column="0" Text="{Binding ExpandIcon}" FontSize="13" Foreground="#FFD700" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="Bold"/>
+                                                                    <TextBlock Grid.Column="0" Text="{Binding ExpandIcon}" FontSize="13" Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="Bold"/>
                                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                                         <TextBlock Text="{Binding AppName}" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>
                                                                         <TextBlock Text="{Binding DateString}" FontSize="11" Foreground="#666"/>
                                                                     </StackPanel>
-                                                                    <TextBlock Grid.Column="2" Text="{Binding SelectionSummary}" FontSize="11" Foreground="#FFD700" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                                                    <TextBlock Grid.Column="2" Text="{Binding SelectionSummary}" FontSize="11" Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                                                     <Button Grid.Column="3" Content="&#x1F5D1; Limpar" Height="28" FontSize="11" Padding="10,0" Background="#C0392B" Foreground="White" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkClean_Click"/>
                                                                     <Button Grid.Column="4" Content="&#x2716;" Width="28" Height="28" FontSize="12" Background="Transparent" Foreground="#666" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkDismiss_Click" Margin="6,0,0,0"/>
                                                                 </Grid>
                                                             </Border>
 
                                                             <!-- Expanded: individual items -->
-                                                            <Border Grid.Row="1" CornerRadius="0,0,6,6" Padding="12,0,12,10" Background="#151515" BorderBrush="#333" BorderThickness="0">
+                                                            <Border Grid.Row="1" CornerRadius="0,0,6,6" Padding="12,0,12,10" Background="#151515" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0">
                                                                 <Border.Style>
                                                                     <Style TargetType="Border">
                                                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -723,12 +640,12 @@
                                                                             <ColumnDefinition Width="Auto"/>
                                                                         </Grid.ColumnDefinitions>
                                                                         <TextBlock Text="Arquivos:" FontSize="12" FontWeight="SemiBold" Foreground="#AAA"/>
-                                                                        <Button Grid.Column="1" Content="&#x2705; Tudo" Height="22" FontSize="11" Padding="8,0" Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkSelectAllFiles_Click"/>
+                                                                        <Button Grid.Column="1" Content="&#x2705; Tudo" Height="22" FontSize="11" Padding="8,0" Background="{DynamicResource BorderSubtle}" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkSelectAllFiles_Click"/>
                                                                     </Grid>
                                                                     <ItemsControl ItemsSource="{Binding Files}" Background="Transparent" BorderThickness="0">
                                                                         <ItemsControl.ItemTemplate>
                                                                             <DataTemplate>
-                                                                                <Border Padding="4,2" Margin="0,1" CornerRadius="3" BorderThickness="1" BorderBrush="#2A2A2A" Background="#1A1A1A">
+                                                                                <Border Padding="4,2" Margin="0,1" CornerRadius="3" BorderThickness="1" BorderBrush="#2A2A2A" Background="{DynamicResource Surface1}">
                                                                                     <Border.Style>
                                                                                         <Style TargetType="Border">
                                                                                             <Setter Property="Background" Value="#1A1A1A"/>
@@ -800,12 +717,12 @@
                                                                             <ColumnDefinition Width="Auto"/>
                                                                         </Grid.ColumnDefinitions>
                                                                         <TextBlock Text="Registro:" FontSize="12" FontWeight="SemiBold" Foreground="#AAA"/>
-                                                                        <Button Grid.Column="1" Content="&#x2705; Tudo" Height="22" FontSize="11" Padding="8,0" Background="#333" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkSelectAllReg_Click"/>
+                                                                        <Button Grid.Column="1" Content="&#x2705; Tudo" Height="22" FontSize="11" Padding="8,0" Background="{DynamicResource BorderSubtle}" Foreground="#CCC" BorderThickness="0" Cursor="Hand" Tag="{Binding}" Click="BtnJunkSelectAllReg_Click"/>
                                                                     </Grid>
                                                                     <ItemsControl ItemsSource="{Binding Registry}" Background="Transparent" BorderThickness="0">
                                                                         <ItemsControl.ItemTemplate>
                                                                             <DataTemplate>
-                                                                                <Border Padding="4,2" Margin="0,1" CornerRadius="3" BorderThickness="1" BorderBrush="#2A2A2A" Background="#1A1A1A">
+                                                                                <Border Padding="4,2" Margin="0,1" CornerRadius="3" BorderThickness="1" BorderBrush="#2A2A2A" Background="{DynamicResource Surface1}">
                                                                                     <Border.Style>
                                                                                         <Style TargetType="Border">
                                                                                             <Setter Property="Background" Value="#1A1A1A"/>
@@ -880,14 +797,14 @@
                                 </Border>
                                 <Border x:Name="JunkEmptySection" Margin="0,20" Visibility="Visible">
                                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <TextBlock Text="&#x2705; Nenhum resíduo pendente" FontSize="18" Foreground="#555" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="&#x2705; Nenhum resíduo pendente" FontSize="18" Foreground="{DynamicResource BorderStrong}" HorizontalAlignment="Center"/>
                                         <TextBlock Text="Resíduos de apps desinstalados aparecerão aqui." FontSize="13" Foreground="#444" Margin="0,8,0,0" HorizontalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
                         </ScrollViewer>
 
-                        <Border Grid.Row="2" Background="#252525" CornerRadius="5" Padding="12,8" Margin="0,10,0,0">
+                        <Border Grid.Row="2" Background="{DynamicResource Surface2}" CornerRadius="5" Padding="12,8" Margin="0,10,0,0">
                             <TextBlock x:Name="TxtMaxCleanupStatus" Text="Pronto" FontSize="12" Foreground="#888"/>
                         </Border>
                     </Grid>
@@ -908,7 +825,7 @@
                             <TextBlock Text="Registro de cada limpeza do Deep Uninstall: o que foi removido, backups e falhas. Os arquivos ficam em %LocalAppData%\KitLugia\Logs e sobrevivem ao reboot." Foreground="#AAA" Margin="0,3,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
 
-                        <Border Grid.Row="1" Background="#252525" CornerRadius="5" Padding="12,8" Margin="0,0,0,10">
+                        <Border Grid.Row="1" Background="{DynamicResource Surface2}" CornerRadius="5" Padding="12,8" Margin="0,0,0,10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -917,13 +834,13 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="TxtLogsInfo" Text="Nenhum log carregado" FontSize="12" Foreground="#888" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                <Button Grid.Column="1" Content="Atualizar" Height="30" Padding="10,0" Background="#333" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" Margin="0,0,6,0" Click="BtnLogsRefresh_Click"/>
+                                <Button Grid.Column="1" Content="Atualizar" Height="30" Padding="10,0" Background="{DynamicResource BorderSubtle}" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" Margin="0,0,6,0" Click="BtnLogsRefresh_Click"/>
                                 <Button Grid.Column="2" Content="&#x1F4C2; Abrir Pasta" Height="30" Padding="10,0" Background="#2C3E50" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" Margin="0,0,6,0" Click="BtnLogsOpenFolder_Click"/>
                                 <Button Grid.Column="3" x:Name="BtnLogsDelete" Content="&#x1F5D1; Excluir Log" Height="30" Padding="10,0" Background="#C0392B" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" IsEnabled="False" Click="BtnLogsDelete_Click"/>
                             </Grid>
                         </Border>
 
-                        <ListBox x:Name="LogsList" Grid.Row="2" Height="170" Background="#1E1E1E" BorderBrush="#333" BorderThickness="1" Foreground="White" SelectionChanged="LogsList_SelectionChanged"
+                        <ListBox x:Name="LogsList" Grid.Row="2" Height="170" Background="#1E1E1E" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Foreground="White" SelectionChanged="LogsList_SelectionChanged"
                                  ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
@@ -934,7 +851,7 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Orientation="Vertical">
                                             <TextBlock Text="{Binding FileName}" FontSize="12" Foreground="White"/>
-                                            <TextBlock Text="{Binding AppSummary}" FontSize="11" Foreground="#FFD700" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding AppSummary}" FontSize="11" Foreground="{DynamicResource AccentColor}" TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding DateString}" FontSize="11" Foreground="#888" Margin="0,0,10,0"/>
@@ -945,7 +862,7 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
 
-                        <Border Grid.Row="3" Background="#151515" BorderBrush="#333" BorderThickness="1" CornerRadius="5" Margin="0,10,0,0">
+                        <Border Grid.Row="3" Background="#151515" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="5" Margin="0,10,0,0">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -958,7 +875,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock x:Name="TxtLogViewerTitle" Text="Selecione um log acima" FontSize="12" Foreground="#AAA" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                        <Button Grid.Column="1" x:Name="BtnLogsCopy" Content="&#x1F4CB; Copiar" Height="26" Padding="10,0" Background="#333" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" IsEnabled="False" Click="BtnLogsCopy_Click"/>
+                                        <Button Grid.Column="1" x:Name="BtnLogsCopy" Content="&#x1F4CB; Copiar" Height="26" Padding="10,0" Background="{DynamicResource BorderSubtle}" Foreground="White" BorderThickness="0" FontSize="11" Cursor="Hand" IsEnabled="False" Click="BtnLogsCopy_Click"/>
                                     </Grid>
                                 </Border>
                                 <TextBox x:Name="TxtLogContent" Grid.Row="1" IsReadOnly="True" Background="Transparent" Foreground="#CCC" BorderThickness="0" FontFamily="Consolas" FontSize="12" Padding="10" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Visible" TextWrapping="NoWrap"/>
@@ -973,7 +890,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Border Grid.Row="0" Background="#252525" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                        <Border Grid.Row="0" Background="{DynamicResource Surface2}" CornerRadius="6" Padding="12" Margin="0,0,0,8">
                             <WrapPanel Orientation="Horizontal">
                                 <TextBlock Text="Navegadores detectados:" FontSize="12" Foreground="#888" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                 <ItemsControl x:Name="BrowserList" ItemsSource="{Binding}" FontSize="13" VerticalAlignment="Center">
@@ -996,14 +913,14 @@
                                         ToolTip="Re-detectar navegadores"/>
                             </WrapPanel>
                         </Border>
-                        <Border Grid.Row="1" Background="#252525" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                        <Border Grid.Row="1" Background="{DynamicResource Surface2}" CornerRadius="6" Padding="12" Margin="0,0,0,8">
                             <WrapPanel Orientation="Horizontal">
                                 <TextBlock Text="Navegador origem:" FontSize="12" Foreground="#888" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <ComboBox x:Name="CboSourceBrowser" Width="140" Height="28" Background="#333" Foreground="White"
-                                          BorderBrush="#555" Margin="0,0,16,0"/>
+                                <ComboBox x:Name="CboSourceBrowser" Width="140" Height="28" Background="{DynamicResource BorderSubtle}" Foreground="White"
+                                          BorderBrush="{DynamicResource BorderStrong}" Margin="0,0,16,0"/>
                                 <TextBlock Text="Navegador destino:" FontSize="12" Foreground="#888" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <ComboBox x:Name="CboTargetBrowser" Width="140" Height="28" Background="#333" Foreground="White"
-                                          BorderBrush="#555" Margin="0,0,16,0"/>
+                                <ComboBox x:Name="CboTargetBrowser" Width="140" Height="28" Background="{DynamicResource BorderSubtle}" Foreground="White"
+                                          BorderBrush="{DynamicResource BorderStrong}" Margin="0,0,16,0"/>
                                 <Button x:Name="BtnScanExtensions" Content="🔍 Scan Extensões" Height="28"
                                         Background="#2C3E50" Foreground="White" BorderThickness="0"
                                         Padding="10,0" Margin="0,0,8,0" Cursor="Hand" Click="BtnScanExtensions_Click"/>
@@ -1026,12 +943,12 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Background="#1A1A1A" CornerRadius="6">
+                            <Border Grid.Column="0" Background="{DynamicResource Surface1}" CornerRadius="6">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <ItemsControl x:Name="ExtensionsList" Margin="4">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#252525" CornerRadius="6" Padding="10,8" Margin="2,3" BorderBrush="#333" BorderThickness="1">
+                                            <Border Background="{DynamicResource Surface2}" CornerRadius="6" Padding="10,8" Margin="2,3" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto"/>
@@ -1079,11 +996,11 @@
                                                         <WrapPanel Orientation="Horizontal" Margin="0,4,0,0">
                                                             <TextBlock Text="{Binding SourceBrowser}" FontSize="11" Foreground="#666" Margin="0,0,10,0"/>
                                                             <TextBlock Text="{Binding Engine}" FontSize="11" Foreground="#666" Margin="0,0,10,0"/>
-                                                            <TextBlock Text="{Binding Version}" FontSize="11" Foreground="#555"/>
-                                                            <TextBlock Text="{Binding SizeFormatted}" FontSize="11" Foreground="#555" Margin="10,0,0,0"/>
+                                                            <TextBlock Text="{Binding Version}" FontSize="11" Foreground="{DynamicResource BorderStrong}"/>
+                                                            <TextBlock Text="{Binding SizeFormatted}" FontSize="11" Foreground="{DynamicResource BorderStrong}" Margin="10,0,0,0"/>
                                                         </WrapPanel>
                                                     </StackPanel>
-                                                    <TextBlock Grid.Column="2" Text="{Binding Id}" FontSize="11" Foreground="#555" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="100" TextAlignment="Right"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Id}" FontSize="11" Foreground="{DynamicResource BorderStrong}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="100" TextAlignment="Right"/>
                                                     <Button Grid.Column="3" Content="🗑" Width="28" Height="28"
                                                             Background="#4A1C1C" Foreground="#E74C3C" BorderThickness="0"
                                                             Margin="6,0,0,0" Cursor="Hand"
@@ -1102,7 +1019,7 @@
                                     <TextBlock Text="Resumo" FontSize="12" FontWeight="SemiBold" Foreground="#888" Margin="0,0,0,8"/>
                                     <TextBlock x:Name="TxtExtCount" Text="0 extensões" FontSize="12" Foreground="#AAA"/>
                                     <TextBlock x:Name="TxtExtTotalSize" Text="0 B" FontSize="11" Foreground="#777" Margin="0,4,0,0"/>
-                                    <Rectangle Height="1" Fill="#333" Margin="0,8"/>
+                                    <Rectangle Height="1" Fill="{DynamicResource BorderSubtle}" Margin="0,8"/>
                                     <TextBlock x:Name="TxtExtBrowserStatus" Text="Navegador fechado ✓" FontSize="11" Foreground="#7F8C8D" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Border>
@@ -1117,7 +1034,7 @@
         <Border x:Name="ConfirmOverlay" Grid.RowSpan="2" Panel.ZIndex="100" 
                 Background="#CC000000" Visibility="Collapsed" CornerRadius="8">
             <Border HorizontalAlignment="Center" VerticalAlignment="Center" 
-                    Background="#2A2A2A" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="8" 
+                    Background="#2A2A2A" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="8" 
                     Width="450" Padding="20">
                 <StackPanel>
                     <TextBlock x:Name="ConfirmTitle" FontSize="16" FontWeight="Bold" Foreground="White"/>
@@ -1128,7 +1045,7 @@
                                 Background="#444" Foreground="White" BorderThickness="0" Cursor="Hand"/>
                         <Button x:Name="BtnConfirmYes" Content="Sim" Click="BtnConfirmYes_Click"
                                 Width="100" Height="32"
-                                Background="#C42B1C" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                                Background="{DynamicResource ErrorBrush}" Foreground="White" BorderThickness="0" Cursor="Hand"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -1139,13 +1056,13 @@
         <Border x:Name="PortableScopeOverlay" Grid.RowSpan="2" Panel.ZIndex="105"
                 Background="#CC000000" Visibility="Collapsed" CornerRadius="8">
             <Border HorizontalAlignment="Center" VerticalAlignment="Center"
-                    Background="#2A2A2A" BorderBrush="#FFD700" BorderThickness="1" CornerRadius="8"
+                    Background="#2A2A2A" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="8"
                     Width="540" Padding="20">
                 <StackPanel>
                     <TextBlock Text="Escopo do Scan de Portáteis" FontSize="16" FontWeight="Bold" Foreground="White"/>
                     <TextBlock Text="Selecione os discos que o scan deve analisar. O perfil do usuário (C:) cobre Desktop, Downloads, Documentos e AppData — a raiz do C: não é varrida por ser grande demais."
                                FontSize="12" Foreground="#999" Margin="0,8,0,0" TextWrapping="Wrap"/>
-                    <Border Background="#1E1E1E" BorderBrush="#333" BorderThickness="1" CornerRadius="6"
+                    <Border Background="#1E1E1E" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="6"
                             Padding="12,8,12,8" Margin="0,12,0,0" MaxHeight="240">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel x:Name="PortableScopeDrivePanels"/>
@@ -1165,7 +1082,7 @@
                                 Background="#444" Foreground="White" BorderThickness="0" Cursor="Hand"/>
                         <Button x:Name="BtnScopeScan" Content="Escanear" Click="BtnScopeScan_Click"
                                 Width="100" Height="32"
-                                Background="{StaticResource AccentColor}" Foreground="#1A1405" BorderThickness="0" Cursor="Hand"/>
+                                Background="{DynamicResource AccentColor}" Foreground="#1A1405" BorderThickness="0" Cursor="Hand"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -1211,9 +1128,9 @@
                         </Border>
                         <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
                             <TextBlock Text="PONTO DE RESTAURAÇÃO" FontSize="18" FontWeight="ExtraBold"
-                                       Foreground="{StaticResource GoldGradient}"/>
+                                       Foreground="{DynamicResource GoldGradient}"/>
                             <TextBlock x:Name="TxtRestorePointStatus" Text="Preparando..." FontSize="13"
-                                       Foreground="{StaticResource TextSecondary}" Margin="0,5,0,0"
+                                       Foreground="{DynamicResource TextSecondary}" Margin="0,5,0,0"
                                        TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
@@ -1231,13 +1148,13 @@
                                 <ColumnDefinition x:Name="ColRestoreRest" Width="100*"/>
                             </Grid.ColumnDefinitions>
                             <Border x:Name="RestorePointBarFill" Grid.Column="0"
-                                    Background="{StaticResource GoldGradient}"/>
+                                    Background="{DynamicResource GoldGradient}"/>
                             <Border Grid.Column="1"/>
                         </Grid>
                     </Border>
 
                     <TextBlock x:Name="TxtRestorePointPercent" Text="0%" FontSize="13" FontWeight="Bold"
-                               Foreground="{StaticResource AccentColor}"
+                               Foreground="{DynamicResource AccentColor}"
                                Margin="0,6,0,0" HorizontalAlignment="Right"/>
 
                     <Grid Margin="0,10,0,0">
@@ -1249,7 +1166,7 @@
                                    Opacity="0.75"/>
                         <TextBlock x:Name="TxtRestorePointHint" Grid.Column="1"
                                    Text="O Windows pode levar alguns segundos para registrar o ponto de restauração. Não feche o KitLugia."
-                                   FontSize="12" Foreground="{StaticResource TextDescription}"
+                                   FontSize="12" Foreground="{DynamicResource TextDescription}"
                                    TextWrapping="Wrap"/>
                     </Grid>
 
@@ -1272,19 +1189,19 @@
 
             <!-- Header -->
             <StackPanel Grid.Row="0" Margin="0,0,0,12">
-                <TextBlock x:Name="ReviewTitle" Text="Deep Cleanup" FontSize="22" FontWeight="Bold" Foreground="{StaticResource AccentColor}"/>
+                <TextBlock x:Name="ReviewTitle" Text="Deep Cleanup" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource AccentColor}"/>
                 <TextBlock x:Name="ReviewSubtitle" Text="Revise os resíduos encontrados após a desinstalação" FontSize="13" Foreground="#AAA" Margin="0,4,0,0"/>
             </StackPanel>
 
             <!-- Info bar -->
-            <Border Grid.Row="1" Background="#252525" CornerRadius="5" Padding="14,10" Margin="0,0,0,12">
+            <Border Grid.Row="1" Background="{DynamicResource Surface2}" CornerRadius="5" Padding="14,10" Margin="0,0,0,12">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="ReviewInfoText" FontSize="12" Foreground="#BBB" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="ReviewInfoCount" Grid.Column="1" FontSize="12" Foreground="{StaticResource AccentColor}" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="ReviewInfoCount" Grid.Column="1" FontSize="12" Foreground="{DynamicResource AccentColor}" FontWeight="Bold" VerticalAlignment="Center"/>
                 </Grid>
             </Border>
 
@@ -1300,7 +1217,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Border Background="#252525" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+                        <Border Background="{DynamicResource Surface2}" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -1423,7 +1340,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Border Background="#252525" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+                        <Border Background="{DynamicResource Surface2}" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -1543,7 +1460,7 @@
             </TabControl>
 
             <!-- Bottom bar -->
-            <Border Grid.Row="3" Background="#252525" CornerRadius="5" Padding="14,10" Margin="0,12,0,0">
+            <Border Grid.Row="3" Background="{DynamicResource Surface2}" CornerRadius="5" Padding="14,10" Margin="0,12,0,0">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>

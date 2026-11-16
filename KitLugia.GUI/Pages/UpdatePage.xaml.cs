@@ -34,7 +34,10 @@ namespace KitLugia.GUI.Pages
             {
                 try
                 {
-                    await LoadCurrentVersionInfoAsync();
+                    // Antes só carregava as infos locais e NUNCA verificava: a coluna da direita
+                    // ficava eternamente em "Verificando..." até o usuário clicar em "Verificar Agora".
+                    // Agora a verificação roda sozinha ao abrir a página (usa o cache de 1 h, custo baixo).
+                    await Task.WhenAll(LoadCurrentVersionInfoAsync(), RunCheckAsync(forceRefresh: false));
                 }
                 catch (Exception ex)
                 {
@@ -86,13 +89,10 @@ namespace KitLugia.GUI.Pages
                 var assembly = Assembly.GetExecutingAssembly();
                 var assemblyVersion = assembly.GetName().Version?.ToString() ?? "1.0.0.0";
 
-                // ✅. Timeout de 10 segundos para segurança
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                
-                var versionInfo = await Task.Run(async () => 
-                {
-                    return await KitLugia.Core.SmartVersionDetector.GetVersionInfoAsync();
-                }, cts.Token);
+                // Timeout de 10 s REAL: WaitAsync interrompe a espera; o token passado ao Task.Run
+                // só cancelava antes de iniciar e não limitava a requisição HTTP.
+                var versionInfo = await KitLugia.Core.SmartVersionDetector.GetVersionInfoAsync()
+                    .WaitAsync(TimeSpan.FromSeconds(10));
                 
                 var localBuildDate = DateTimeOffset.Now; // Data/hora atual com timezone do usuário
                 var exePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
@@ -123,7 +123,7 @@ namespace KitLugia.GUI.Pages
 
                 CurrentInfoPanel.Children.Add(new TextBlock { Text = $"🔩 Assembly: {assemblyVersion}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
                 CurrentInfoPanel.Children.Add(new TextBlock { Text = $"🔍 Detecção: {versionInfo.DetectionMethod}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
-                CurrentInfoPanel.Children.Add(new TextBlock { Text = $"📦 Releases Online: {versionInfo.TotalReleases}", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
+                CurrentInfoPanel.Children.Add(new TextBlock { Text = versionInfo.TotalReleases > 0 ? $"📦 Releases Online: {versionInfo.TotalReleases}" : "📦 Releases Online: indisponível (sem conexão)", FontSize = 12, Foreground = Brushes.Gray, Margin = new Thickness(0, 2, 0, 2) });
                 
 
                 KitLugia.Core.Logger.Log($"📦 Versão DIN,MICA: Real={versionInfo.RealVersion}, Assembly={assemblyVersion}, Método={versionInfo.DetectionMethod}, Total={versionInfo.TotalReleases}");
@@ -131,7 +131,7 @@ namespace KitLugia.GUI.Pages
             catch (UnauthorizedAccessException ex)
             {
                 // ✅. Erro de permissão - mostrar fallback
-                CurrentVersionText.Text = "v2.0.5";
+                CurrentVersionText.Text = $"v{KitLugia.Core.SmartVersionDetector.GetCurrentAssemblyVersion()}";
                 CurrentBuildDateText.Text = $"📅 Compilado: {DateTime.Now:dd/MM/yyyy HH:mm}";
                 CurrentNowDateText.Text = $"🕐 Agora: {DateTimeOffset.Now:dd/MM/yyyy HH:mm}";
                 CurrentTimezoneText.Text = $"🌍 Timezone: {TimeZoneInfo.Local.DisplayName}";
@@ -143,10 +143,10 @@ namespace KitLugia.GUI.Pages
                 
                 KitLugia.Core.Logger.Log($"✅ Erro de permissão: {ex.Message}");
             }
-            catch (OperationCanceledException)
+            catch (Exception ex) when (ex is OperationCanceledException || ex is TimeoutException)
             {
                 // ✅. Timeout - mostrar fallback
-                CurrentVersionText.Text = "v2.0.5";
+                CurrentVersionText.Text = $"v{KitLugia.Core.SmartVersionDetector.GetCurrentAssemblyVersion()}";
                 CurrentBuildDateText.Text = $"📅 Compilado: {DateTime.Now:dd/MM/yyyy HH:mm}";
                 CurrentNowDateText.Text = $"🕐 Agora: {DateTimeOffset.Now:dd/MM/yyyy HH:mm}";
                 CurrentTimezoneText.Text = $"🌍 Timezone: {TimeZoneInfo.Local.DisplayName}";
@@ -160,7 +160,7 @@ namespace KitLugia.GUI.Pages
             catch (Exception ex)
             {
                 // ✅. Erro - mostrar fallback
-                CurrentVersionText.Text = "v2.0.5";
+                CurrentVersionText.Text = $"v{KitLugia.Core.SmartVersionDetector.GetCurrentAssemblyVersion()}";
                 CurrentBuildDateText.Text = $"📅 Compilado: {DateTime.Now:dd/MM/yyyy HH:mm}";
                 CurrentNowDateText.Text = $"🕐 Agora: {DateTimeOffset.Now:dd/MM/yyyy HH:mm}";
                 CurrentTimezoneText.Text = $"🌍 Timezone: {TimeZoneInfo.Local.DisplayName}";
@@ -182,7 +182,7 @@ namespace KitLugia.GUI.Pages
 #endif
         }
 
-        private async Task CheckForUpdatesAsync()
+        private async Task CheckForUpdatesAsync(bool forceRefresh = false)
         {
             try
             {
@@ -193,9 +193,18 @@ namespace KitLugia.GUI.Pages
                 UpdateButton.IsEnabled = false;
 
 
-                await GetReleaseDetails();
+                await GetReleaseDetails(forceRefresh);
                 
-                if (_latestRelease != null)
+                if (_latestRelease == null)
+                {
+                    // Antes: sem release (offline/rate limit) o status ficava preso em "Verificando...".
+                    StatusText.Text = $"❌ {GitHubUpdater.LastError ?? "Não foi possível consultar o GitHub."}";
+                    StatusBorder.Background = new SolidColorBrush(Color.FromRgb(229, 57, 53));
+                    StatusText.Foreground = Brushes.White;
+                    UpdateButton.IsEnabled = false;
+                    ManualDownloadLink.Visibility = Visibility.Visible;
+                }
+                else
                 {
 
                     var currentVersion = GetCurrentVersion();
@@ -236,7 +245,7 @@ namespace KitLugia.GUI.Pages
             }
             catch (Exception ex)
             {
-                StatusText.Text = $"✅ Erro: {ex.Message}";
+                StatusText.Text = $"❌ Erro: {ex.Message}";
                 StatusBorder.Background = new SolidColorBrush(Color.FromRgb(229, 57, 53)); // Vermelho forte
                 StatusText.Foreground = Brushes.White;
                 KitLugia.Core.Logger.Log($"Erro na verificação: {ex.Message}");
@@ -264,8 +273,8 @@ namespace KitLugia.GUI.Pages
                 }
                 else
                 {
-                    MessageBox.Show("Link de download não disponível. Tente verificar as atualizações novamente.", 
-                        "Link Indisponível", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    // Sem release carregada (offline/rate limit): abre a página de releases mesmo assim.
+                    OpenUrl(GitHubUpdater.ReleasesUrl);
                 }
             }
             catch (Exception ex)
@@ -276,13 +285,13 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private async Task GetReleaseDetails()
+        private async Task GetReleaseDetails(bool forceRefresh = false)
         {
             try
             {
                 KitLugia.Core.Logger.Log("Buscando detalhes do release GitHub...");
 
-                _latestRelease = await GitHubUpdater.GetLatestReleaseAsync();
+                _latestRelease = await GitHubUpdater.GetLatestReleaseAsync(forceRefresh);
                 
                 if (_latestRelease != null)
                 {
@@ -328,7 +337,7 @@ namespace KitLugia.GUI.Pages
                     LatestVersionText.Text = "Offline";
                     LatestDateText.Text = "--/--/---- --:--";
                     LatestSizeText.Text = "N/A";
-                    ReleaseNotesText.Text = "Sem conexão com GitHub e nenhum cache disponível.";
+                    ReleaseNotesText.Text = GitHubUpdater.LastError ?? "Sem conexão com GitHub e nenhum cache disponível.";
                 }
             }
             catch (Exception ex)
@@ -429,21 +438,50 @@ namespace KitLugia.GUI.Pages
             }
         }
 
-        private async void CheckButton_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Executa a verificação com guarda anti-reentrância (clique duplo / abertura + clique).
+        /// </summary>
+        private async Task RunCheckAsync(bool forceRefresh)
         {
             if (_isUpdateOperation) return;
             _isUpdateOperation = true;
             try
             {
-                await CheckForUpdatesAsync();
+                await CheckForUpdatesAsync(forceRefresh);
             }
             catch (Exception ex)
             {
-                Logger.LogError("CheckButton_Click", ex.Message);
+                Logger.LogError("UpdatePage.RunCheckAsync", ex.Message);
             }
             finally
             {
                 _isUpdateOperation = false;
+            }
+        }
+
+        // "Verificar Agora" ignora o cache de 1 h: o usuário quer saber se saiu release nova AGORA.
+        private async void CheckButton_Click(object sender, RoutedEventArgs e)
+        {
+            await RunCheckAsync(forceRefresh: true);
+        }
+
+        private void BtnOpenRepo_Click(object sender, RoutedEventArgs e)
+        {
+            OpenUrl(GitHubUpdater.RepoUrl);
+        }
+
+        private static void OpenUrl(string url)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+                KitLugia.Core.Logger.Log($"🔗 Abrindo: {url}");
+            }
+            catch (Exception ex)
+            {
+                KitLugia.Core.Logger.Log($"Erro ao abrir link: {ex.Message}");
+                MessageBox.Show($"Não foi possível abrir o navegador.\n\nEndereço: {url}\n\n{ex.Message}",
+                    "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -471,7 +509,10 @@ namespace KitLugia.GUI.Pages
                 else
                 {
                     OverlayBusy.Visibility = Visibility.Collapsed;
-                    StatusText.Text = "❌ Falha na atualização automática. Tente o download manual.";
+                    StatusText.Text = "❌ Falha na atualização automática"
+                        + (string.IsNullOrEmpty(GitHubUpdater.LastError) ? "" : $": {GitHubUpdater.LastError}")
+                        + " Tente o download manual.";
+                    ManualDownloadLink.Visibility = Visibility.Visible;
                     UpdateButton.IsEnabled = true;
                     CheckButton.IsEnabled = true;
                 }
@@ -601,7 +642,8 @@ namespace KitLugia.GUI.Pages
                 KitLugia.Core.Logger.Log($"📂 Extraindo arquivos para {extractDir}...");
                 try
                 {
-                    System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, extractDir);
+                    // Task.Run: a extração de um zip de dezenas de MB travava a UI (continuação roda na thread de UI).
+                    await Task.Run(() => System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, extractDir));
                     KitLugia.Core.Logger.Log("✅ Extração concluída!");
                 }
                 catch (Exception ex)
@@ -614,7 +656,9 @@ namespace KitLugia.GUI.Pages
                 int currentPid = Process.GetCurrentProcess().Id;
                 string currentExePath = Environment.ProcessPath ?? "";
                 if (string.IsNullOrEmpty(currentExePath))
-                    currentExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "KitLugia.GUI.exe");
+                    currentExePath = KitLugia.Core.AppPaths.GetRunningExePath();
+                if (string.IsNullOrEmpty(currentExePath))
+                    currentExePath = KitLugia.Core.AppPaths.ResolveAppExePath(AppDomain.CurrentDomain.BaseDirectory) ?? "";
 
                 string currentVersion = GetCurrentVersion().ToString();
                 string newVersion = _latestRelease.TagName ?? currentVersion;

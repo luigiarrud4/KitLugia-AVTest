@@ -12,10 +12,10 @@
         <StackPanel Margin="30,30,30,50" MaxWidth="900">
 
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="Calibra&#xE7;&#xE3;o e Tela" Margin="0,0,0,10"/>
-            <TextBlock Text="Gerencie perfis de cores e corrija resets causados por updates de driver." Foreground="#A0A0A0" Margin="0,0,0,30"/>
+            <TextBlock Text="Gerencie perfis de cores e corrija resets causados por updates de driver." Foreground="{DynamicResource TextDescription}" Margin="0,0,0,30"/>
 
             <!-- PAINEL DE INFORMA&#xC7;&#xD5;ES -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource AccentColor}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25" Style="{StaticResource CardStyle}">
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,25" Style="{StaticResource CardStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -36,7 +36,7 @@
 
             <!-- CONTROLE DE PERFIL DE COR -->
             <TextBlock Text="Backup de Cores (Gamma Ramp)" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
-            <Border Background="#1A1A1A" CornerRadius="8" Padding="20" BorderBrush="#333" BorderThickness="1">
+            <Border Background="{DynamicResource Surface1}" CornerRadius="8" Padding="20" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
                 <StackPanel>
                     <TextBlock Text="Isso salva o brilho, contraste e curvas de cor atuais. Se as cores ficarem 'lavadas', restaure. Se ficarem 'estouradas', resete." 
                                Foreground="#888" TextWrapping="Wrap" Margin="0,0,0,15"/>
@@ -54,7 +54,7 @@
                         <Button Grid.Column="0" Height="50" Click="BtnSaveProfile_Click" Cursor="Hand" ToolTip="Salva o estado atual">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
-                                    <Border x:Name="bdr" Background="#25FFFFFF" CornerRadius="6" BorderBrush="#555" BorderThickness="1">
+                                    <Border x:Name="bdr" Background="#25FFFFFF" CornerRadius="6" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1">
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <TextBlock Text="&#x1F4BE;" FontSize="20" Margin="0,0,10,0"/>
                                             <StackPanel>
@@ -65,8 +65,8 @@
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="bdr" Property="Background" Value="{StaticResource AccentColor}"/>
-                                            <Setter TargetName="bdr" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                            <Setter TargetName="bdr" Property="Background" Value="{DynamicResource AccentColor}"/>
+                                            <Setter TargetName="bdr" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
                                             <Setter Property="Foreground" Value="Black"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
@@ -78,12 +78,12 @@
                         <Button Grid.Column="2" Height="50" Click="BtnLoadProfile_Click" Cursor="Hand" ToolTip="Aplica o perfil salvo">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
-                                    <Border x:Name="bdr" Background="{StaticResource AccentColor}" CornerRadius="6">
+                                    <Border x:Name="bdr" Background="{DynamicResource AccentColor}" CornerRadius="6">
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <TextBlock Text="&#x21BA;" FontSize="20" Margin="0,0,10,0" Foreground="Black" FontWeight="Bold"/>
                                             <StackPanel>
                                                 <TextBlock Text="RESTAURAR" FontWeight="Bold" Foreground="Black"/>
-                                                <TextBlock Text="Aplicar backup" FontSize="11" Foreground="#333"/>
+                                                <TextBlock Text="Aplicar backup" FontSize="11" Foreground="{DynamicResource BorderSubtle}"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </Border>
@@ -100,7 +100,7 @@
                         <Button Grid.Column="4" Height="50" Click="BtnResetProfile_Click" Cursor="Hand" ToolTip="Limpa qualquer altera&#xE7;&#xE3;o de cor">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
-                                    <Border x:Name="bdr" Background="#33C42B1C" CornerRadius="6" BorderBrush="#C42B1C" BorderThickness="1">
+                                    <Border x:Name="bdr" Background="#33C42B1C" CornerRadius="6" BorderBrush="{DynamicResource ErrorBrush}" BorderThickness="1">
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <TextBlock Text="&#x1F5D1;&#xFE0F;" FontSize="20" Margin="0,0,10,0"/>
                                             <StackPanel>
@@ -119,7 +119,7 @@
                         </Button>
                     </Grid>
 
-                    <TextBlock x:Name="TxtProfileStatus" Text="Nenhum perfil carregado." HorizontalAlignment="Center" Margin="0,15,0,0" Foreground="{StaticResource TextMuted}" FontStyle="Italic"/>
+                    <TextBlock x:Name="TxtProfileStatus" Text="Nenhum perfil carregado." HorizontalAlignment="Center" Margin="0,15,0,0" Foreground="{DynamicResource TextMuted}" FontStyle="Italic"/>
                 </StackPanel>
             </Border>
 

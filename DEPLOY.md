@@ -52,7 +52,7 @@ O script faz tudo automaticamente:
 | 2/6 | Ativa/verifica a conta `luigiarrud4` no `gh` **e** no `git` (`gh auth setup-git` + `git credential fill`) |
 | 3/6 | Build + ZIP + SHA256 via `Deploy.ps1`, e valida que os dois arquivos existem |
 | 4/6 | **`git add -A` + commit + `git push origin HEAD:main`** |
-| 5/6 | Cria a release `--target main` com **`--generate-notes`** (ou só substitui os assets se já existe) |
+| 5/6 | Cria a release `--target main`: resumo de commits local (`kl_deploy_notes.ps1`) **prependido** ao `--generate-notes` (gerador do GitHub); fallback com o resumo local só. Se já existe, substitui só os assets |
 | 6/6 | Verifica a tag remota e lista os assets publicados |
 
 ### Regras que não devem mudar
@@ -88,24 +88,39 @@ O script faz tudo automaticamente:
 
 ---
 
-## Descrição da release (notas automáticas do GitHub)
+## Descrição da release (resumo de commits local + gerador do GitHub)
 
-O passo 5 usa **`--generate-notes`** — o equivalente pelo CLI do botão
-**"Generate release notes"** da interface do GitHub (Release Notes API, o
-recurso automático/IA que a interface mostra ao criar uma release). Ele monta a
-descrição com os PRs mergeados, os contribuidores e o link para o changelog
-completo desde a release anterior. O título continua sendo `KitLugia vX.Y.Z`
-(`--title`), porque `--generate-notes` também geraria um título automático.
+A descrição é montada em 3 camadas, para nunca sair vazia:
 
-Antes dessa mudança a descrição era o texto fixo
-`--notes "Release automatica vX.Y.Z"` (era literalmente o corpo da `v2.0.64`).
-Nenhuma anotação interna da IA entra aqui: `.workbuddy-ai/` está no
-`.gitignore` e não é enviada ao GitHub.
+1. **Resumo de commits local** — `kl_deploy_notes.ps1` lê `git log` da
+   release anterior até o HEAD e agrupa por tipo (Conventional Commits:
+   Features / Bug fixes / Performance / Refactoring / Tests / Documentation /
+   Chores / Other), com scope e hash curto. Escreve
+   `%TEMP%\kl_deploy_notes.md`. O commit "Deploy vX.Y.Z" do próprio deploy é
+   excluído (não acrescenta informação). Esta camada existe porque o gerador
+   do GitHub **só lista PRs mergeados** e este repo faz push direto no main —
+   sem ela, o corpo seria apenas o link de comparação.
+2. **Gerador do GitHub** (`--generate-notes`, o botão "Generate release
+   notes" da interface) — o resumo local é **prependido** ao corpo gerado
+   (PRs, contribuidores e o link Full Changelog oficial) via `--notes-file`.
+   O título continua sendo `KitLugia vX.Y.Z` (`--title`).
+3. **Fallback** — se a API de notas falhar (rate limit, indisponibilidade),
+   a release é recriada com o resumo local sozinho (link de comparação
+   emendado) ou, sem resumo local, com texto mínimo. O código já foi
+   empurrado; a release não pode morrer por causa das notas.
 
-Se o `--generate-notes` falhar (rate limit, indisponibilidade da API), o
-passo 5 tenta uma segunda vez com `--notes` mínimo: o código já foi
-empurrado e a release não pode morrer por causa da API de notas. O passo 6
-imprime os assets e o corpo das notas geradas para conferência.
+Antes disso, a descrição era o texto fixo
+`--notes "Release automatica vX.Y.Z"` (era literalmente o corpo da `v2.0.64`)
+ou apenas o link de comparação. Nenhuma anotação interna da IA entra aqui:
+`.workbuddy-ai/` está no `.gitignore` e não é enviada ao GitHub.
+
+O passo 6 imprime os assets e o corpo final das notas para conferência.
+
+Teste do resumo standalone (sem publicar nada):
+
+```powershell
+.\kl_deploy_notes.ps1 -Version 2.0.66 -BaseTag v2.0.64   # -> %TEMP%\kl_deploy_notes.md
+```
 
 > **Limitação real deste repositório:** hoje não há PRs mergeados (`gh pr list
 > --state merged` → `[]`), e o gerador do GitHub lista **PRs, não commits
@@ -115,11 +130,10 @@ imprime os assets e o corpo das notas geradas para conferência.
 > empurrar o HEAD para `main`, a tag `v2.0.64` passa a ser ancestral e o
 > intervalo do changelog fica mais correto.
 >
-> Para enriquecer sem abrir mão das notas automáticas, duas opções:
-> - `--generate-notes --notes "Resumo da versão..."` — o `gh` **prepend** o texto
->   customizado às notas geradas;
-> - criar `.github/release.yml` para categorizar por labels (só ajuda se houver
->   PRs com labels).
+> Para enriquecer, a camada 1 (resumo de commits local) já cobre o caso sem
+> PRs. Se o fluxo mudar para PRs mergeados, o gerador (camada 2) passa a
+> listá-los com autor e label, e um `.github/release.yml` permite categorizar
+> por label (feat/fix/etc.) na parte automática.
 
 Nota: o ramo "release já existe" faz só `gh release upload --clobber` e **não**
 regera a descrição — ela fica como estava na criação da release.

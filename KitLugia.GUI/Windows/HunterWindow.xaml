@@ -5,7 +5,7 @@
         WindowStartupLocation="CenterScreen"
         TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Consolas, Segoe UI Emoji"
         TextElement.Foreground="White"
-        Background="#0F0F0F"
+        Background="{DynamicResource Surface0}"
         SnapsToDevicePixels="True"
         UseLayoutRounding="True">
     <Window.Resources>
@@ -44,7 +44,7 @@
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" ResizeBorderThickness="4"/>
     </WindowChrome.WindowChrome>
-    <Border BorderBrush="#FFD700" BorderThickness="1">
+    <Border BorderBrush="{DynamicResource AccentColor}" BorderThickness="1">
         <Grid Margin="8">
             <Grid.RowDefinitions>
                 <RowDefinition Height="24"/>
@@ -54,10 +54,10 @@
             </Grid.RowDefinitions>
 
             <!-- Drag handle -->
-            <Border Grid.Row="0" Background="#1A1A1A" Cursor="SizeAll"
+            <Border Grid.Row="0" Background="{DynamicResource Surface1}" Cursor="SizeAll"
                     MouseDown="DragBar_MouseDown">
                 <Grid>
-                    <TextBlock Text="KitLugia Spy" FontSize="11" Foreground="#555"
+                    <TextBlock Text="KitLugia Spy" FontSize="11" Foreground="{DynamicResource BorderStrong}"
                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     <TextBlock x:Name="BtnClose" Text="&#x2715;" FontSize="12" Foreground="#666"
                                HorizontalAlignment="Right" VerticalAlignment="Center"
@@ -67,8 +67,8 @@
             </Border>
 
             <!-- Crosshair bar -->
-            <Border Grid.Row="1" Background="#1A1A1A" CornerRadius="4" Padding="8" Margin="0,4,0,8"
-                    BorderBrush="#333" BorderThickness="1">
+            <Border Grid.Row="1" Background="{DynamicResource Surface1}" CornerRadius="4" Padding="8" Margin="0,4,0,8"
+                    BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
                 <StackPanel Orientation="Horizontal">
                     <Border x:Name="FinderButton" Width="32" Height="32"
                             Background="#2255AA" CornerRadius="4"
@@ -81,10 +81,10 @@
                                Foreground="#888" Margin="10,0,0,0"/>
                     <Button x:Name="BtnAutoRefresh" Content="Auto"
                             Margin="10,0,0,0" Padding="8,2" FontSize="11"
-                            Background="#252525" Foreground="#888" BorderBrush="#555" BorderThickness="1"
+                            Background="{DynamicResource Surface2}" Foreground="#888" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1"
                             Cursor="Hand" Click="BtnAutoRefresh_Click"/>
                     <TextBlock x:Name="TxtStatus" Text="Pronto" VerticalAlignment="Center"
-                               Foreground="#4CAF50" FontSize="11" Margin="10,0,0,0"/>
+                               Foreground="{DynamicResource SuccessBrush}" FontSize="11" Margin="10,0,0,0"/>
                 </StackPanel>
             </Border>
 
@@ -95,51 +95,51 @@
                 <StackPanel Margin="8">
 
                     <!-- Handle -->
-                    <Label Content="Handle" FontWeight="SemiBold" Foreground="#FFD700" Padding="0,6,0,2"/>
+                    <Label Content="Handle" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Padding="0,6,0,2"/>
                     <TextBox x:Name="TxtHwnd" IsReadOnly="True"
                              FontFamily="Consolas" FontSize="12"
-                             Background="#1A1A1A" Foreground="#CCCCCC"
-                             BorderBrush="#333" BorderThickness="1" Padding="4"
+                             Background="{DynamicResource Surface1}" Foreground="#CCCCCC"
+                             BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="4"
                              Text="-"/>
 
                     <!-- PID -->
-                    <Label Content="PID" FontWeight="SemiBold" Foreground="#FFD700" Padding="0,6,0,2"/>
+                    <Label Content="PID" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Padding="0,6,0,2"/>
                     <TextBox x:Name="TxtPid" IsReadOnly="True"
                              FontFamily="Consolas" FontSize="12"
-                             Background="#1A1A1A" Foreground="#CCCCCC"
-                             BorderBrush="#333" BorderThickness="1" Padding="4"
+                             Background="{DynamicResource Surface1}" Foreground="#CCCCCC"
+                             BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="4"
                              Text="-"/>
 
                     <!-- Title -->
-                    <Label Content="Título" FontWeight="SemiBold" Foreground="#FFD700" Padding="0,6,0,2"/>
+                    <Label Content="Título" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Padding="0,6,0,2"/>
                     <TextBox x:Name="TxtTitle" IsReadOnly="True"
                              FontSize="12"
-                             Background="#1A1A1A" Foreground="#CCCCCC"
-                             BorderBrush="#333" BorderThickness="1" Padding="4"
+                             Background="{DynamicResource Surface1}" Foreground="#CCCCCC"
+                             BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="4"
                              Text="-"/>
 
                     <!-- Class -->
-                    <Label Content="Classe" FontWeight="SemiBold" Foreground="#FFD700" Padding="0,6,0,2"/>
+                    <Label Content="Classe" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Padding="0,6,0,2"/>
                     <TextBox x:Name="TxtClass" IsReadOnly="True"
                              FontFamily="Consolas" FontSize="12"
-                             Background="#1A1A1A" Foreground="#CCCCCC"
-                             BorderBrush="#333" BorderThickness="1" Padding="4"
+                             Background="{DynamicResource Surface1}" Foreground="#CCCCCC"
+                             BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="4"
                              Text="-"/>
 
                     <!-- Rectangle -->
-                    <Label Content="Retângulo" FontWeight="SemiBold" Foreground="#FFD700" Padding="0,6,0,2"/>
+                    <Label Content="Retângulo" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Padding="0,6,0,2"/>
                     <TextBox x:Name="TxtRect" IsReadOnly="True"
                              FontFamily="Consolas" FontSize="12"
-                             Background="#1A1A1A" Foreground="#CCCCCC"
-                             BorderBrush="#333" BorderThickness="1" Padding="4"
+                             Background="{DynamicResource Surface1}" Foreground="#CCCCCC"
+                             BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="4"
                              Text="-"/>
 
                     <!-- Processo -->
-                    <Label Content="Processo" FontWeight="SemiBold" Foreground="#FFD700" Padding="0,6,0,2"/>
+                    <Label Content="Processo" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Padding="0,6,0,2"/>
                     <TextBox x:Name="TxtProcess" IsReadOnly="True"
                              FontSize="12"
-                             Background="#1A1A1A" Foreground="#CCCCCC"
-                             BorderBrush="#333" BorderThickness="1" Padding="4"
+                             Background="{DynamicResource Surface1}" Foreground="#CCCCCC"
+                             BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="4"
                              Text="-"/>
                     <TextBox x:Name="TxtPath" IsReadOnly="True"
                              FontSize="11" Foreground="#858585"
@@ -157,35 +157,35 @@
                         <Label Grid.Column="0" Content="Visível" FontSize="11" Padding="0,2,4,2" Foreground="#888"/>
                         <TextBox x:Name="TxtVisible" Grid.Column="1" IsReadOnly="True"
                                  FontFamily="Consolas" FontSize="11"
-                                 Background="#1A1A1A" Foreground="#CCCCCC" BorderBrush="#333" BorderThickness="1"
+                                 Background="{DynamicResource Surface1}" Foreground="#CCCCCC" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1"
                                  Padding="2" Text="-" Margin="0,0,8,0"/>
                         <Label Grid.Column="2" Content="Parent" FontSize="11" Padding="0,2,4,2" Foreground="#888"/>
                         <TextBox x:Name="TxtParent" Grid.Column="3" IsReadOnly="True"
                                  FontFamily="Consolas" FontSize="11"
-                                 Background="#1A1A1A" Foreground="#CCCCCC" BorderBrush="#333" BorderThickness="1"
+                                 Background="{DynamicResource Surface1}" Foreground="#CCCCCC" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1"
                                  Padding="2" Text="-"/>
                     </Grid>
 
                     <!-- Styles -->
-                    <Label Content="Estilos WS" FontWeight="SemiBold" Foreground="#FFD700" Padding="0,6,0,2"/>
+                    <Label Content="Estilos WS" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Padding="0,6,0,2"/>
                     <TextBox x:Name="TxtStyles" IsReadOnly="True" TextWrapping="Wrap"
                              FontFamily="Consolas" FontSize="11" MaxHeight="60"
-                             Background="#1A1A1A" Foreground="#CCCCCC"
-                             BorderBrush="#333" BorderThickness="1" Padding="4"
+                             Background="{DynamicResource Surface1}" Foreground="#CCCCCC"
+                             BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="4"
                              Text="-" VerticalScrollBarVisibility="Auto"/>
 
                     <!-- Extended Styles -->
-                    <Label Content="Estilos WS_EX" FontWeight="SemiBold" Foreground="#FFD700" Padding="0,6,0,2"/>
+                    <Label Content="Estilos WS_EX" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Padding="0,6,0,2"/>
                     <TextBox x:Name="TxtExStyles" IsReadOnly="True" TextWrapping="Wrap"
                              FontFamily="Consolas" FontSize="11" MaxHeight="60"
-                             Background="#1A1A1A" Foreground="#CCCCCC"
-                             BorderBrush="#333" BorderThickness="1" Padding="4"
+                             Background="{DynamicResource Surface1}" Foreground="#CCCCCC"
+                             BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Padding="4"
                              Text="-" VerticalScrollBarVisibility="Auto"/>
 
                     <!-- Child windows -->
-                    <Label Content="Janelas Filhas" FontWeight="SemiBold" Foreground="#FFD700" Padding="0,6,0,2"/>
+                    <Label Content="Janelas Filhas" FontWeight="SemiBold" Foreground="{DynamicResource AccentColor}" Padding="0,6,0,2"/>
                     <ListBox x:Name="ListChildren" MinHeight="80" MaxHeight="120"
-                             Background="#1A1A1A" BorderBrush="#333" BorderThickness="1"
+                             Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1"
                              Foreground="#CCCCCC" FontFamily="Consolas" FontSize="11"/>
 
                     </StackPanel>
@@ -193,23 +193,23 @@
             </Border>
 
             <!-- Action buttons -->
-            <Border Grid.Row="3" Background="#1A1A1A" CornerRadius="4" Padding="6" Margin="0,8,0,0"
-                    BorderBrush="#333" BorderThickness="1">
+            <Border Grid.Row="3" Background="{DynamicResource Surface1}" CornerRadius="4" Padding="6" Margin="0,8,0,0"
+                    BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button x:Name="BtnUninstall" Content="Desinstalar" Padding="12,6" Margin="4,0"
-                            Background="#C42B1C" Foreground="White" BorderThickness="0"
+                            Background="{DynamicResource ErrorBrush}" Foreground="White" BorderThickness="0"
                             Cursor="Hand" IsEnabled="False" Click="BtnUninstall_Click"/>
                     <Button x:Name="BtnKill" Content="Matar" Padding="12,6" Margin="4,0"
-                            Background="#252525" Foreground="#E0E0E0" BorderBrush="#555" BorderThickness="1"
+                            Background="{DynamicResource Surface2}" Foreground="#E0E0E0" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1"
                             Cursor="Hand" IsEnabled="False" Click="BtnKill_Click"/>
                     <Button x:Name="BtnKillDel" Content="Matar + Deletar" Padding="12,6" Margin="4,0"
-                            Background="#252525" Foreground="#E0E0E0" BorderBrush="#555" BorderThickness="1"
+                            Background="{DynamicResource Surface2}" Foreground="#E0E0E0" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1"
                             Cursor="Hand" IsEnabled="False" Click="BtnKillDel_Click"/>
                     <Button x:Name="BtnOpenFolder" Content="Abrir Pasta" Padding="12,6" Margin="4,0"
-                            Background="#252525" Foreground="#E0E0E0" BorderBrush="#555" BorderThickness="1"
+                            Background="{DynamicResource Surface2}" Foreground="#E0E0E0" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1"
                             Cursor="Hand" IsEnabled="False" Click="BtnOpenFolder_Click"/>
                     <Button x:Name="BtnProperties" Content="Propriedades" Padding="12,6" Margin="4,0"
-                            Background="#252525" Foreground="#E0E0E0" BorderBrush="#555" BorderThickness="1"
+                            Background="{DynamicResource Surface2}" Foreground="#E0E0E0" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1"
                             Cursor="Hand" IsEnabled="False" Click="BtnProperties_Click"/>
                 </StackPanel>
             </Border>

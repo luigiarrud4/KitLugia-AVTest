@@ -38,7 +38,7 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="bdr" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                    <Setter TargetName="bdr" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
                                     <Setter TargetName="bdr" Property="Background" Value="#2A2A2A"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
@@ -59,7 +59,7 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="bdr" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                    <Setter TargetName="bdr" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
                                     <Setter TargetName="bdr" Property="Background" Value="#2A2A2A"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
@@ -80,7 +80,7 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="bdr" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                    <Setter TargetName="bdr" Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
                                     <Setter TargetName="bdr" Property="Background" Value="#2A2A2A"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
@@ -106,7 +106,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <TextBlock Text="LOG DE EXECU&#xC7;&#xC3;O" FontSize="11" Foreground="#666" Margin="0,0,0,5" FontWeight="Bold"/>
-                    <Border Grid.Row="1" Background="#111" CornerRadius="6" BorderBrush="#333" BorderThickness="1" Height="200">
+                    <Border Grid.Row="1" Background="#111" CornerRadius="6" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Height="200">
                         <ScrollViewer x:Name="LogScroller" VerticalScrollBarVisibility="Auto">
                             <TextBox x:Name="TxtLog" Background="Transparent" Foreground="#AAA" BorderThickness="0"
                                      IsReadOnly="True" Padding="10" FontFamily="Consolas" TextWrapping="Wrap"
@@ -146,9 +146,9 @@
             <!-- SE&#xC7;&#xC3;O AVAN&#xC7;ADA: Cache de Navegadores                        -->
             <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
             <TextBlock Text="&#x1F527; Ferramentas Avan&#xE7;adas" FontSize="16" FontWeight="Bold"
-                       Foreground="{StaticResource AccentColor}" Margin="0,0,0,12"/>
+                       Foreground="{DynamicResource AccentColor}" Margin="0,0,0,12"/>
 
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}"
                     BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,16" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <Grid Margin="0,0,0,12">
@@ -158,7 +158,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="&#x1F310; Cache de Navegadores" FontSize="16" FontWeight="Bold"
-                                       Foreground="{StaticResource AccentColor}"/>
+                                       Foreground="{DynamicResource AccentColor}"/>
                             <TextBlock x:Name="TxtBrowserCacheTotal" Text="Clique em 'Detectar' para verificar."
                                        FontSize="12" Foreground="#888" Margin="0,3,0,0"/>
                         </StackPanel>
@@ -174,7 +174,7 @@
                     <ItemsControl x:Name="BrowserList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="#1A1A1A" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
+                                <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -188,7 +188,7 @@
                                             <TextBlock Text="{Binding CacheSizeFormatted}" FontSize="11" Foreground="#888"/>
                                         </StackPanel>
                                         <TextBlock Grid.Column="2" Text="{Binding CacheSizeFormatted}" FontSize="12"
-                                                   Foreground="{StaticResource AccentColor}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                                   Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                         <Button Grid.Column="3" Content="Limpar" Style="{StaticResource SecondaryButtonStyle}"
                                                 Width="70" Height="28" Tag="{Binding Name}" Click="BtnCleanSingleBrowser_Click"/>
                                     </Grid>
@@ -199,14 +199,14 @@
 
                     <TextBlock x:Name="TxtNoBrowsers"
                                Text="Nenhum navegador detectado ainda. Clique em 'Detectar'."
-                               FontSize="12" Foreground="#555" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                               FontSize="12" Foreground="{DynamicResource BorderStrong}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
                 </StackPanel>
             </Border>
 
             <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
             <!-- SE&#xC7;&#xC3;O: Limpeza de Evid&#xEA;ncias (MRU, hist&#xF3;rico, rastros) -->
             <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}"
                     BorderThickness="1" CornerRadius="8" Padding="20" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <Grid Margin="0,0,0,10">
@@ -217,7 +217,7 @@
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#x1F50D; Limpeza de Evid&#xEA;ncias" FontSize="16" FontWeight="Bold"
-                                           Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
+                                           Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <TextBlock Text="Remove rastros de uso: MRU, documentos recentes, jump lists, UserAssist, Timeline, etc."
                                        FontSize="11" Foreground="#888" Margin="0,3,0,0" TextWrapping="Wrap"/>
@@ -235,7 +235,7 @@
                     <ItemsControl x:Name="EvidenceList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="#1A1A1A" CornerRadius="6" Padding="12,8" Margin="0,0,0,4">
+                                <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="12,8" Margin="0,0,0,4">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -258,14 +258,14 @@
 
                     <TextBlock x:Name="TxtNoEvidence"
                                Text="Clique em 'Selecionar Todos' e depois 'Limpar' para remover evid&#xEA;ncias."
-                               FontSize="12" Foreground="#555" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                               FontSize="12" Foreground="{DynamicResource BorderStrong}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
                 </StackPanel>
             </Border>
 
             <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
             <!-- SE&#xC7;&#xC3;O: Scanner de Portable Apps                              -->
             <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}"
                     BorderThickness="1" CornerRadius="8" Padding="20" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <Grid Margin="0,0,0,10">
@@ -276,7 +276,7 @@
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#x1F4E6; Portable Apps Scanner" FontSize="16" FontWeight="Bold"
-                                           Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
+                                           Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <TextBlock x:Name="TxtPortableScanResult"
                                        Text="Detecta aplicativos port&#xE1;teis em Download, Desktop, outras unidades."
@@ -294,7 +294,7 @@
                     <ItemsControl x:Name="PortableAppList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="#1A1A1A" CornerRadius="6" Padding="12,8" Margin="0,0,0,4">
+                                <Border Background="{DynamicResource Surface1}" CornerRadius="6" Padding="12,8" Margin="0,0,0,4">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -311,12 +311,12 @@
                                                     <TextBlock Text="{Binding ConfidenceLabel}" FontSize="11" Foreground="White"/>
                                                 </Border>
                                             </StackPanel>
-                                            <TextBlock Text="{Binding FolderPath}" FontSize="11" Foreground="#555"
+                                            <TextBlock Text="{Binding FolderPath}" FontSize="11" Foreground="{DynamicResource BorderStrong}"
                                                        TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
                                             <TextBlock Text="{Binding TotalSizeFormatted}" FontSize="12"
-                                                       Foreground="{StaticResource AccentColor}" HorizontalAlignment="Right"/>
+                                                       Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Right"/>
                                             <TextBlock Text="{Binding LastModifiedFormatted}" FontSize="11"
                                                        Foreground="#666" HorizontalAlignment="Right"/>
                                         </StackPanel>
@@ -331,14 +331,14 @@
 
                     <TextBlock x:Name="TxtNoPortable"
                                Text="Clique em 'Detectar' para procurar aplicativos port&#xE1;teis."
-                               FontSize="12" Foreground="#555" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                               FontSize="12" Foreground="{DynamicResource BorderStrong}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
                 </StackPanel>
             </Border>
 
             <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
             <!-- SE&#xC7;&#xC3;O: Monitor de Instala&#xE7;&#xF5;es (Revo-style)              -->
             <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}"
                     BorderThickness="1" CornerRadius="8" Padding="20" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <Grid Margin="0,0,0,10">
@@ -349,8 +349,8 @@
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#x1F4E1; Monitor de Instala&#xE7;&#xF5;es" FontSize="16" FontWeight="Bold"
-                                           Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
-                                <Border x:Name="MonitorStatusDot" Background="#555" CornerRadius="5"
+                                           Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center"/>
+                                <Border x:Name="MonitorStatusDot" Background="{DynamicResource BorderStrong}" CornerRadius="5"
                                         Width="10" Height="10" Margin="8,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                             <TextBlock x:Name="TxtMonitorStatus"
@@ -400,7 +400,7 @@
                                                     <TextBlock Text="{Binding Details}" FontSize="11" Foreground="#666"/>
                                                 </StackPanel>
                                                 <TextBlock Grid.Column="3" Text="{Binding TimestampFormatted}" FontSize="11"
-                                                           Foreground="#555" VerticalAlignment="Center"/>
+                                                           Foreground="{DynamicResource BorderStrong}" VerticalAlignment="Center"/>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -411,14 +411,14 @@
 
                     <TextBlock x:Name="TxtNoMonitorChanges"
                                Text="Clique em 'Iniciar Monitor', depois 'Snapshot' antes de instalar e 'Comparar' ap&#xF3;s."
-                               FontSize="12" Foreground="#555" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                               FontSize="12" Foreground="{DynamicResource BorderStrong}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
                 </StackPanel>
             </Border>
 
             <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
             <!-- SE&#xC7;&#xC3;O AVAN&#xC7;ADA: Limpador de Registro                        -->
             <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
-            <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource CardBorder}"
+            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}"
                     BorderThickness="1" CornerRadius="8" Padding="20" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <Grid Margin="0,0,0,10">
@@ -429,12 +429,12 @@
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#x1F527; Limpador de Registro" FontSize="16" FontWeight="Bold"
-                                           Foreground="{StaticResource AccentColor}" VerticalAlignment="Center"/>
+                                           Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center"/>
                                 <!-- &#xCD;cone de informa&#xE7;&#xE3;o -->
                                 <Border Background="#2A2A2A" CornerRadius="10" Width="20" Height="20"
                                         Margin="8,0,0,0" VerticalAlignment="Center" Cursor="Help"
                                     ToolTip="O auditor de registro lista entradas suspeitas para revis&#xE3;o. Por padr&#xE3;o, os achados ficam como Manual para evitar remover integra&#xE7;&#xF5;es de apps, menus de contexto e associa&#xE7;&#xF5;es de arquivo. Use Copiar para pesquisar antes de qualquer limpeza.">
-                                    <TextBlock Text="&#x2139;" FontSize="11" Foreground="{StaticResource AccentColor}"
+                                    <TextBlock Text="&#x2139;" FontSize="11" Foreground="{DynamicResource AccentColor}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                             </StackPanel>
@@ -496,11 +496,11 @@
                                                 </Border>
                                             </Grid>
                                             <Border.ContextMenu>
-                                                <ContextMenu Background="#1A1A1A" BorderBrush="{StaticResource AccentColor}" BorderThickness="1">
+                                                <ContextMenu Background="{DynamicResource Surface1}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1">
                                                     <MenuItem Header="Remover este item" Click="MenuRemoveSingleIssue_Click"
                                                               Foreground="#FF6F61" FontWeight="Bold"/>
                                                     <MenuItem Header="Copiar caminho do registro" Click="MenuCopyIssuePath_Click"/>
-                                                    <Separator Background="#333"/>
+                                                    <Separator Background="{DynamicResource BorderSubtle}"/>
                                                     <MenuItem Header="Pesquisar no Google" Click="MenuSearchIssue_Click"/>
                                                 </ContextMenu>
                                             </Border.ContextMenu>
