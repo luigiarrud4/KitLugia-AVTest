@@ -35,7 +35,7 @@ namespace KitLugia.GUI.Windows.TaskManager
         {
             public string Key { get; init; } = "";
             public string Name { get; init; } = "";
-            public string ColorHex { get; init; } = "#008000";
+            public string ColorHex { get; init; } = "#4CAF50";
             private string _summary = "";
             public string Summary { get => _summary; set { if (!string.Equals(_summary, value)) { _summary = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Summary))); } } }
             public event PropertyChangedEventHandler? PropertyChanged;
@@ -289,7 +289,7 @@ namespace KitLugia.GUI.Windows.TaskManager
         private static System.Windows.Media.Color FromHex(string hex)
         {
             try { return (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex); }
-            catch { return System.Windows.Media.Color.FromRgb(0x00, 0x80, 0x00); }
+            catch { return System.Windows.Media.Color.FromRgb(0x4C, 0xAF, 0x50); }
         }
 
         // ─── Cache de informações ricas de hardware (pré-carregado UMA vez, como o Task Manager) ───
@@ -462,8 +462,8 @@ namespace KitLugia.GUI.Windows.TaskManager
             // CPU usa o NOME DO PROCESSADOR como título (prioridade, como no Task Manager)
             await Dispatcher.InvokeAsync(() =>
             {
-                _perfDevices.Add(new PerfDeviceInfo { Key = "cpu", Name = _hwCpuName, ColorHex = "#008000" });
-                _perfDevices.Add(new PerfDeviceInfo { Key = "mem", Name = "Memória", ColorHex = "#000080" });
+                _perfDevices.Add(new PerfDeviceInfo { Key = "cpu", Name = _hwCpuName, ColorHex = "#4CAF50" });
+                _perfDevices.Add(new PerfDeviceInfo { Key = "mem", Name = "Memória", ColorHex = "#2196F3" });
             });
 
             int di = 0;
@@ -484,7 +484,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 int physNum = mNum.Success ? int.Parse(mNum.Groups[1].Value) : di;
                 string letters = ExtractDriveLetters(d);
                 string label = $"Disco {physNum} ({letters})";
-                await dd.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = key, Name = label, ColorHex = "#B8860B" }));
+                await dd.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = key, Name = label, ColorHex = "#FF9800" }));
                 di++;
             }
 
@@ -514,17 +514,17 @@ namespace KitLugia.GUI.Windows.TaskManager
                 string label = conn.Equals("Conectado", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(conn)
                     ? (isVirt ? $"Rede virtual ({Truncate(n, 14)})" : $"Ethernet ({Truncate(n, 16)})")
                     : (isVirt && !conn.Contains("virtual", StringComparison.OrdinalIgnoreCase) ? $"{conn} (virtual)" : conn);
-                await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = key, Name = label, ColorHex = "#800080" }));
+                await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = key, Name = label, ColorHex = "#9C27B0" }));
             }
 
             int gi = 0;
             foreach (var g in data.gpus)
             {
                 var gg = g; int idx = gi;
-                await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = $"gpu:{idx}", Name = gg.Name, ColorHex = "#000080" }));
+                await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = $"gpu:{idx}", Name = gg.Name, ColorHex = "#4FC3F7" }));
                 gi++;
             }
-            if (gi == 0) await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = "gpu:-1", Name = "GPU (indisponível)", ColorHex = "#808080" }));
+            if (gi == 0) await Dispatcher.InvokeAsync(() => _perfDevices.Add(new PerfDeviceInfo { Key = "gpu:-1", Name = "GPU (indisponível)", ColorHex = "#888888" }));
 
             await Dispatcher.InvokeAsync(() =>
             {
@@ -590,9 +590,9 @@ namespace KitLugia.GUI.Windows.TaskManager
             }
             void Row(string label, out TextBlock valueBlock)
             {
-                var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x40, 0x40, 0x40)), Margin = new Thickness(0, 1, 12, 1), TextWrapping = TextWrapping.Wrap };
-                tb.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0x60, 0x60)) });
-                var val = new System.Windows.Documents.Run("…") { Foreground = System.Windows.Media.Brushes.Black, FontWeight = FontWeights.SemiBold };
+                var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)), Margin = new Thickness(0, 1, 12, 1), TextWrapping = TextWrapping.Wrap };
+                tb.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88)) });
+                var val = new System.Windows.Documents.Run("…") { Foreground = System.Windows.Media.Brushes.White, FontWeight = FontWeights.SemiBold };
                 tb.Inlines.Add(val);
                 AddDetail(tb);
                 valueBlock = tb; // o próprio TextBlock (Tag guarda o Run do valor)
@@ -601,9 +601,9 @@ namespace KitLugia.GUI.Windows.TaskManager
             }
             void StaticRow(string label, string value)
             {
-                var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x40, 0x40, 0x40)), Margin = new Thickness(0, 1, 12, 1), TextWrapping = TextWrapping.Wrap };
-                tb.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0x60, 0x60)) });
-                tb.Inlines.Add(new System.Windows.Documents.Run(value) { Foreground = System.Windows.Media.Brushes.Black });
+                var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)), Margin = new Thickness(0, 1, 12, 1), TextWrapping = TextWrapping.Wrap };
+                tb.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88)) });
+                tb.Inlines.Add(new System.Windows.Documents.Run(value) { Foreground = System.Windows.Media.Brushes.White });
                 AddDetail(tb);
             }
 
@@ -763,7 +763,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             {
                 double t = lv?.TemperatureC ?? -1;
                 _perfGpuTempRun.Text = t >= 0 ? $"{t:F0} °C" : "—";
-                _perfGpuTempRun.Foreground = t >= 0 ? GetHeatColor((float)t, 75, 90) : System.Windows.Media.Brushes.Black;
+                _perfGpuTempRun.Foreground = t >= 0 ? GetHeatColor((float)t, 75, 90) : System.Windows.Media.Brushes.White;
             }
             if (_perfGpuDxRun != null)
             {
@@ -794,9 +794,9 @@ namespace KitLugia.GUI.Windows.TaskManager
             PnlGpuGraphs.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             PnlGpuGraphs.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            var rotulo = new SolidColorBrush(Color.FromRgb(0x60, 0x60, 0x60));
-            var fundoGrafico = new SolidColorBrush(Color.FromRgb(0x00, 0x00, 0x00));
-            var fundoTrilho = new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80));
+            var rotulo = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
+            var fundoGrafico = new SolidColorBrush(Color.FromRgb(0x0B, 0x11, 0x18));
+            var fundoTrilho = new SolidColorBrush(Color.FromRgb(0x1F, 0x2A, 0x3A));
 
             GpuChartPart Engine(string label, string key, Color cor, int row, int col)
             {
@@ -806,7 +806,7 @@ namespace KitLugia.GUI.Windows.TaskManager
 
                 var head = new TextBlock { FontSize = 10, Foreground = rotulo };
                 head.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = rotulo });
-                var val = new System.Windows.Documents.Run("0%") { Foreground = Brushes.Black, FontWeight = FontWeights.SemiBold };
+                var val = new System.Windows.Documents.Run("0%") { Foreground = Brushes.White, FontWeight = FontWeights.SemiBold };
                 head.Inlines.Add(val);
 
                 var cv = new Canvas { Background = fundoGrafico, Margin = new Thickness(0, 1, 0, 0) };
@@ -825,7 +825,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 var host = new StackPanel { Margin = new Thickness(0, 2, 0, 1) };
                 var head = new TextBlock { FontSize = 10, Foreground = rotulo };
                 head.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = rotulo });
-                var val = new System.Windows.Documents.Run("—") { Foreground = Brushes.Black, FontWeight = FontWeights.SemiBold };
+                var val = new System.Windows.Documents.Run("—") { Foreground = Brushes.White, FontWeight = FontWeights.SemiBold };
                 head.Inlines.Add(val);
 
                 var track = new Canvas { Height = 5, Background = fundoTrilho, Margin = new Thickness(0, 2, 0, 0) };
@@ -848,12 +848,12 @@ namespace KitLugia.GUI.Windows.TaskManager
                 return new GpuChartPart { Chart = track, Value = val, Bar = fill, Key = key, LineColor = cor };
             }
 
-            _gpuChart3D = Engine("3D", "gpu3d", Color.FromRgb(0x00, 0x00, 0x80), 0, 0);
-            _gpuChartCopy = Engine("Copy", "gpucopy", Color.FromRgb(0x80, 0x00, 0x80), 0, 1);
-            _gpuChartEnc = Engine("Video Encode", "gpue", Color.FromRgb(0xB8, 0x86, 0x0B), 1, 0);
-            _gpuChartDec = Engine("Video Decode", "gpud", Color.FromRgb(0x00, 0x80, 0x00), 1, 1);
-            _gpuBarDed = MemBar("Memória da GPU dedicada", "gpubard", Color.FromRgb(0x00, 0x00, 0x80), 2);
-            _gpuBarShared = MemBar("Memória da GPU compartilhada", "gpubars", Color.FromRgb(0x80, 0x00, 0x80), 3);
+            _gpuChart3D = Engine("3D", "gpu3d", Color.FromRgb(0xC0, 0x84, 0xFC), 0, 0);
+            _gpuChartCopy = Engine("Copy", "gpucopy", Color.FromRgb(0x4F, 0xC3, 0xF7), 0, 1);
+            _gpuChartEnc = Engine("Video Encode", "gpue", Color.FromRgb(0xF5, 0x9E, 0x0B), 1, 0);
+            _gpuChartDec = Engine("Video Decode", "gpud", Color.FromRgb(0x34, 0xD3, 0x99), 1, 1);
+            _gpuBarDed = MemBar("Memória da GPU dedicada", "gpubard", Color.FromRgb(0xC0, 0x84, 0xFC), 2);
+            _gpuBarShared = MemBar("Memória da GPU compartilhada", "gpubars", Color.FromRgb(0x4F, 0xC3, 0xF7), 3);
         }
 
         /// <summary>Empurra a amostra nas 4 curvas de engine e nas 2 barras de VRAM.</summary>
@@ -1068,9 +1068,9 @@ namespace KitLugia.GUI.Windows.TaskManager
 
         private System.Windows.Documents.Run AddLiveLine(string label)
         {
-            var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x40, 0x40, 0x40)), Margin = new Thickness(0, 1, 12, 1), TextWrapping = TextWrapping.Wrap };
-            tb.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0x60, 0x60)) });
-            var val = new System.Windows.Documents.Run("…") { Foreground = System.Windows.Media.Brushes.Black };
+            var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)), Margin = new Thickness(0, 1, 12, 1), TextWrapping = TextWrapping.Wrap };
+            tb.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88)) });
+            var val = new System.Windows.Documents.Run("…") { Foreground = System.Windows.Media.Brushes.White };
             tb.Inlines.Add(val);
             // Mesma grade de 2 colunas do painel: o indice e compartilhado com as
             // linhas estaticas para que nada se sobreponha.
@@ -1135,9 +1135,9 @@ namespace KitLugia.GUI.Windows.TaskManager
 
         private static System.Windows.Controls.TextBlock MkRow(string label, string value)
         {
-            var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x40, 0x40, 0x40)), Margin = new Thickness(0, 1, 0, 1), TextWrapping = TextWrapping.Wrap };
-            tb.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0x60, 0x60)) });
-            tb.Inlines.Add(new System.Windows.Documents.Run(value ?? "") { Foreground = System.Windows.Media.Brushes.Black });
+            var tb = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)), Margin = new Thickness(0, 1, 0, 1), TextWrapping = TextWrapping.Wrap };
+            tb.Inlines.Add(new System.Windows.Documents.Run(label + "  ") { Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88)) });
+            tb.Inlines.Add(new System.Windows.Documents.Run(value ?? "") { Foreground = System.Windows.Media.Brushes.White });
             return tb;
         }
 
@@ -1268,7 +1268,7 @@ namespace KitLugia.GUI.Windows.TaskManager
             {
                 _miniCpuHistory.Enqueue(cpuVal);
                 if (_miniCpuHistory.Count > 30) _miniCpuHistory.Dequeue();
-                DrawLineChart(MiniCpuCanvas, _miniCpuHistory, System.Windows.Media.Color.FromRgb(0x00, 0x80, 0x00), 100f);
+                DrawLineChart(MiniCpuCanvas, _miniCpuHistory, System.Windows.Media.Color.FromRgb(0x4C, 0xAF, 0x50), 100f);
             }
         }
 

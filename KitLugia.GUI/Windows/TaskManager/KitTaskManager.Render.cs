@@ -40,9 +40,9 @@ namespace KitLugia.GUI.Windows.TaskManager
         private double _renderFps;
 
         internal static readonly System.Windows.Media.Color ColorRowNew =
-            System.Windows.Media.Color.FromRgb(0x00, 0x80, 0x00);   // verde "nasceu"
+            System.Windows.Media.Color.FromRgb(0x2E, 0x7D, 0x32);   // verde "nasceu"
         internal static readonly System.Windows.Media.Color ColorRowDead =
-            System.Windows.Media.Color.FromRgb(0xC0, 0x00, 0x00);   // vermelho "fechou"
+            System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28);   // vermelho "fechou"
 
         /// <summary>Tempo do fade do brilho de processo novo/morto (segundos).</summary>
         private const double HighlightFadeSeconds = 2.5;

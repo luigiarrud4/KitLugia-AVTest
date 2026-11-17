@@ -44,10 +44,10 @@ namespace KitLugia.GUI.Windows.TaskManager
         private readonly Dictionary<int, LatCoreRow> _latCoreIndex = new();
         private readonly Dictionary<int, LatProcRow> _latProcIndex = new();
 
-        private static readonly SolidColorBrush LatOk = LatBrush(0x00, 0x80, 0x00);
-        private static readonly SolidColorBrush LatWarn = LatBrush(0xB8, 0x86, 0x0B);
-        private static readonly SolidColorBrush LatBad = LatBrush(0xC0, 0x00, 0x00);
-        private static readonly SolidColorBrush LatIdle = LatBrush(0x60, 0x60, 0x60);
+        private static readonly SolidColorBrush LatOk = LatBrush(0x4C, 0xAF, 0x50);
+        private static readonly SolidColorBrush LatWarn = LatBrush(0xFF, 0xB7, 0x4D);
+        private static readonly SolidColorBrush LatBad = LatBrush(0xF4, 0x43, 0x36);
+        private static readonly SolidColorBrush LatIdle = LatBrush(0x77, 0x77, 0x77);
 
         private static SolidColorBrush LatBrush(byte r, byte g, byte b)
         {
@@ -245,8 +245,8 @@ namespace KitLugia.GUI.Windows.TaskManager
             bool running = _lat.IsRunning;
             LatState.Text = running ? "MONITORANDO" : "PARADO";
             LatStateBadge.Background = running
-                ? new SolidColorBrush(Color.FromRgb(0xD4, 0xED, 0xDA))
-                : new SolidColorBrush(Color.FromRgb(0xD4, 0xD0, 0xC8));
+                ? new SolidColorBrush(Color.FromRgb(0x16, 0x35, 0x1B))
+                : new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
             LatState.Foreground = running ? LatOk : LatIdle;
             BtnLatToggle.Content = running ? "■ PARAR" : "▶ INICIAR";
             if (!running) LatEtwStatus.Text = "";

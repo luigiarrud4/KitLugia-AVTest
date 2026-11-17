@@ -43,7 +43,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                     StJournalText.Text = "(nenhuma intervenção até agora — o Kit não suspendeu, não parou e não reiniciou nada)";
                     StJournalBadgeText.Text = "NADA FEITO";
                     StJournalBadgeText.Foreground = StIdle;
-                    StJournalBadge.Background = StBrush(0xD4, 0xD0, 0xC8);
+                    StJournalBadge.Background = StBrush(0x33, 0x33, 0x33);
                     BtnStUndoAll.IsEnabled = false;
                     return;
                 }
@@ -55,7 +55,7 @@ namespace KitLugia.GUI.Windows.TaskManager
 
                 StJournalBadgeText.Text = pending > 0 ? $"{pending} A DESFAZER" : $"{entries.Count} REGISTRO(S)";
                 StJournalBadgeText.Foreground = pending > 0 ? StWarn : StOk;
-                StJournalBadge.Background = pending > 0 ? StBrush(0xFF, 0xF3, 0xCD) : StBrush(0xD4, 0xED, 0xDA);
+                StJournalBadge.Background = pending > 0 ? StBrush(0x3A, 0x30, 0x12) : StBrush(0x1B, 0x3A, 0x24);
                 BtnStUndoAll.IsEnabled = pending > 0;
                 BtnStUndoAll.Content = pending > 0 ? $"↩ Desfazer {pending} agora" : "↩ Nada a desfazer";
             }
@@ -126,7 +126,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 {
                     StAudioBadgeText.Text = "DESLIGADO";
                     StAudioBadgeText.Foreground = StIdle;
-                    StAudioBadge.Background = StBrush(0xD4, 0xD0, 0xC8);
+                    StAudioBadge.Background = StBrush(0x33, 0x33, 0x33);
                     StAudioText.Text = "A escuta de áudio está desligada. Ligando, o Kit registra cada estalo do som " +
                                        "(pela API oficial de detecção de glitch do Windows) e cruza com o estado do disco " +
                                        "no mesmo instante.";
@@ -139,7 +139,7 @@ namespace KitLugia.GUI.Windows.TaskManager
                 {
                     StAudioBadgeText.Text = playing ? "ESCUTANDO (SOM TOCANDO)" : "ESCUTANDO";
                     StAudioBadgeText.Foreground = StOk;
-                    StAudioBadge.Background = StBrush(0xD4, 0xED, 0xDA);
+                    StAudioBadge.Background = StBrush(0x1B, 0x3A, 0x24);
                     StAudioText.Text = $"Escutando em \"{audio.DeviceName}\" — nenhuma travada de áudio até agora. " +
                                        (playing
                                            ? "Há som tocando: deixe rodar enquanto o problema acontece."
@@ -153,7 +153,7 @@ namespace KitLugia.GUI.Windows.TaskManager
 
                 StAudioBadgeText.Text = confirmed > 0 ? $"{confirmed} CONFIRMADA(S)" : $"{total} INDÍCIO(S)";
                 StAudioBadgeText.Foreground = confirmed > 0 ? StWarn : StIdle;
-                StAudioBadge.Background = confirmed > 0 ? StBrush(0xFF, 0xF3, 0xCD) : StBrush(0xD4, 0xD0, 0xC8);
+                StAudioBadge.Background = confirmed > 0 ? StBrush(0x3A, 0x30, 0x12) : StBrush(0x33, 0x33, 0x33);
 
                 var sb = new StringBuilder();
                 if (worst != null)
