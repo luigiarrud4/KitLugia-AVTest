@@ -5,11 +5,23 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
       xmlns:controls="clr-namespace:KitLugia.GUI.Controls"
+      xmlns:conv="clr-namespace:KitLugia.GUI.Converters"
       mc:Ignorable="d" 
       Title="ServicesPage"
       TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Arial" d:DesignHeight="700" d:DesignWidth="950">
 
     <Page.Resources>
+
+        <!-- Ícone 20px do item de inicialização (caminho resolvido pelo Core + cache do ProgramIconHelper) -->
+        <conv:StartupIconConverter x:Key="StartupIconConverter"/>
+
+        <!-- Cores exclusivas DESTA aba (não são tema do app: nenhuma outra página usa).
+             Status "off" e o dourado do KitLugia em modo normal. Sucesso/erro usam
+             SuccessBrush/ErrorBrush do tema, que já existiam com o mesmo hex. -->
+        <SolidColorBrush x:Key="StartupStatusOff" Color="#777777"/>
+        <SolidColorBrush x:Key="StartupTurboNormal" Color="#E8C98A"/>
+        <!-- Cor de status (hex do Core) -> brush, para o texto E a pill de origem do item -->
+        <conv:HexToBrushConverter x:Key="HexToBrush"/>
 
         <Style TargetType="TabItem">
             <Setter Property="FontSize" Value="14"/>
@@ -55,7 +67,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <TextBlock Text="Aplicativos que iniciam com o Windows" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center"/>
 
                         <TextBox x:Name="TxtSearchStartup" Width="240" Height="32" MinHeight="0" Margin="10,0,0,0"
@@ -68,91 +80,154 @@
 
                     <Border Grid.Row="1" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="6" Background="#111">
                         <DataGrid x:Name="GridStartup" SelectionMode="Single" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingStackPanel.VirtualizationMode="Recycling" PreviewMouseRightButtonDown="GridStartup_PreviewMouseRightButtonDown">
+                            <!-- Linha em 3 níveis, como no optimizerDuck: nome + pill da origem,
+                                 fabricante e caminho. Altura automática porque a célula empilha texto. -->
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                    <Setter Property="Height" Value="Auto"/>
+                                    <Setter Property="MinHeight" Value="50"/>
+                                </Style>
+                            </DataGrid.RowStyle>
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Nome" Binding="{Binding Name}" Width="250" IsReadOnly="True" SortMemberPath="Name">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                            <Setter Property="VerticalAlignment" Value="Center"/>
-                                            <!-- Descrição (IFEO/LSA/PrintMon/UWP): nome + o que é; sem descrição, só o nome -->
-                                            <Setter Property="ToolTip" Value="{Binding DisplayToolTip}"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
+                                <DataGridTemplateColumn Header="" Width="52" IsReadOnly="True" CanUserSort="False" CanUserResize="False">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <!-- 34px: ícones de traço fino (moldura do cute-borders, folha do
+                                                 wscript do HERMES) ficavam ilegíveis em 26px. -->
+                                            <Image Width="34" Height="34" VerticalAlignment="Center" Stretch="Uniform"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   Source="{Binding Converter={StaticResource StartupIconConverter}}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
 
-                                <DataGridTextColumn Header="Comando / Caminho" Binding="{Binding FullCommand}" Width="*" IsReadOnly="True" SortMemberPath="FullCommand">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                            <Setter Property="Foreground" Value="#777"/>
-                                            <Setter Property="FontStyle" Value="Italic"/>
-                                            <Setter Property="VerticalAlignment" Value="Center"/>
-                                            <Setter Property="ToolTip" Value="{Binding FullCommand}"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
+                                <!-- Conteúdo do item: nome (branco) + pill da origem na 1ª linha, fabricante na
+                                     2ª (só quando o binário tem metadados) e caminho resolvido na 3ª. -->
+                                <DataGridTemplateColumn Header="Aplicativo" Width="*" IsReadOnly="True" SortMemberPath="Name">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,3" VerticalAlignment="Center">
+                                                <Grid ToolTip="{Binding DisplayToolTip}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <!-- Auto + MaxWidth: o nome ocupa só o que precisa e a pill de
+                                                             argumentos cola nele; passando do limite entra o "...". -->
+                                                        <ColumnDefinition Width="Auto" MaxWidth="380"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="13"
+                                                               Foreground="White" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+
+                                                    <!-- Argumentos de linha de comando (tipo -tray / -silent): pill própria em destaque discreto. -->
+                                                    <Border Grid.Column="1" Background="#1AFFD700" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1"
+                                                            CornerRadius="3" Padding="6,1" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                            MaxWidth="190" ToolTip="{Binding ArgsToolTip}">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding ArgsPill}" Value="">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <TextBlock Text="{Binding ArgsPill}" FontSize="10" FontFamily="Consolas, Cascadia Mono, Courier New"
+                                                                   Foreground="{DynamicResource StartupTurboNormal}" TextTrimming="CharacterEllipsis"/>
+                                                    </Border>
+                                                </Grid>
+
+                                                <!-- Linha 2: fabricante (só quando o binário traz CompanyName/FileDescription). -->
+                                                <TextBlock Text="{Binding Publisher}" FontSize="10.5" Foreground="{DynamicResource TextDescription}"
+                                                           TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding Publisher}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Publisher}" Value="">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+
+                                                <!-- Linha 3: caminho resolvido (ocupa toda a largura livre). -->
+                                                <TextBlock Text="{Binding PathDisplay}" FontSize="10.5" Foreground="{DynamicResource TextMuted}"
+                                                           TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding PathToolTip}"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
 
                                 <DataGridTemplateColumn Header="Status" Width="190" IsReadOnly="True" SortMemberPath="Status">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <TextBlock VerticalAlignment="Center" FontWeight="Bold">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Text" Value="{Binding Status}"/>
-                                                        <Setter Property="Foreground" Value="#777"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Status}" Value="Enabled">
-                                                                <Setter Property="Foreground" Value="#4CAF50"/>
-                                                                <Setter Property="Text" Value="ATIVADO"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Status}" Value="Disabled">
-                                                                <Setter Property="Foreground" Value="#C42B1C"/>
-                                                                <Setter Property="Text" Value="DESATIVADO"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Status}" Value="Elevated">
-                                                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
-                                                                <Setter Property="Text" Value="ELEVADO (ADM)"/>
-                                                                <Setter Property="Effect">
-                                                                    <Setter.Value>
-                                                                        <DropShadowEffect Color="#FFD700" BlurRadius="5" ShadowDepth="0" Opacity="0.4"/>
-                                                                    </Setter.Value>
-                                                                </Setter>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Status}" Value="TurboBoot">
-                                                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
-                                                                <Setter Property="Text" Value="&#x1F680; KITLUGIA (ADMIN)"/>
-                                                                <Setter Property="Effect">
-                                                                    <Setter.Value>
-                                                                        <DropShadowEffect Color="#FFD700" BlurRadius="5" ShadowDepth="0" Opacity="0.4"/>
-                                                                    </Setter.Value>
-                                                                </Setter>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Status}" Value="TurboBootNormal">
-                                                                <Setter Property="Foreground" Value="#E8C98A"/>
-                                                                <Setter Property="Text" Value="&#x1F680; KITLUGIA (NORMAL)"/>
-                                                                <Setter Property="Effect">
-                                                                    <Setter.Value>
-                                                                        <DropShadowEffect Color="#E8C98A" BlurRadius="4" ShadowDepth="0" Opacity="0.25"/>
-                                                                    </Setter.Value>
-                                                                </Setter>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
+                                            <StackPanel VerticalAlignment="Center" Margin="0,3">
+                                                <TextBlock x:Name="StartupStatusText" FontWeight="Bold" TextTrimming="CharacterEllipsis">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="{Binding Status}"/>
+                                                            <Setter Property="Foreground" Value="{DynamicResource StartupStatusOff}"/>
+                                                            <!-- Data da última alteração de estado (o FILETIME que o Gerenciador de Tarefas mostra) -->
+                                                            <Setter Property="ToolTip" Value="{Binding StatusToolTip}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Status}" Value="Enabled">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                                                    <Setter Property="Text" Value="ATIVADO"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}" Value="Disabled">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                                    <Setter Property="Text" Value="DESATIVADO"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}" Value="Elevated">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                                                                    <Setter Property="Text" Value="ELEVADO (ADM)"/>
+                                                                    <Setter Property="Effect">
+                                                                        <Setter.Value>
+                                                                            <DropShadowEffect Color="#FFD700" BlurRadius="5" ShadowDepth="0" Opacity="0.4"/>
+                                                                        </Setter.Value>
+                                                                    </Setter>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}" Value="TurboBoot">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                                                                    <Setter Property="Text" Value="&#x1F680; KITLUGIA (ADMIN)"/>
+                                                                    <Setter Property="Effect">
+                                                                        <Setter.Value>
+                                                                            <DropShadowEffect Color="#FFD700" BlurRadius="5" ShadowDepth="0" Opacity="0.4"/>
+                                                                        </Setter.Value>
+                                                                    </Setter>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}" Value="TurboBootNormal">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource StartupTurboNormal}"/>
+                                                                    <Setter Property="Text" Value="&#x1F680; KITLUGIA (NORMAL)"/>
+                                                                    <Setter Property="Effect">
+                                                                        <Setter.Value>
+                                                                            <DropShadowEffect Color="#E8C98A" BlurRadius="4" ShadowDepth="0" Opacity="0.25"/>
+                                                                        </Setter.Value>
+                                                                    </Setter>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+
+                                                <!-- Origem do item, sob o status e com a MESMA cor dele: o pincel vem do
+                                                     Foreground do texto acima (ElementName), então não há trigger duplicado
+                                                     e o dourado do KITLUGIA (ADMIN) vem junto. Tooltip = chave completa. -->
+                                                <Border Margin="0,2,0,0" Padding="6,1" CornerRadius="3"
+                                                        HorizontalAlignment="Left" BorderThickness="1"
+                                                        Background="#10FFFFFF"
+                                                        BorderBrush="{Binding Foreground, ElementName=StartupStatusText}"
+                                                        ToolTip="{Binding Location}">
+                                                    <TextBlock Text="{Binding LocationShort}" FontSize="10"
+                                                               Foreground="{Binding Foreground, ElementName=StartupStatusText}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </Border>
+                                            </StackPanel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Local" Binding="{Binding Location}" Width="150" IsReadOnly="True" SortMemberPath="Location">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                            <Setter Property="VerticalAlignment" Value="Center"/>
-                                            <Setter Property="Foreground" Value="#999"/>
-                                            <Setter Property="ToolTip" Value="{Binding Location}"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
                             </DataGrid.Columns>
 
                             <!-- Menu de Contexto para Startup -->
@@ -240,7 +315,7 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Button Content="{Binding}" Margin="0,0,4,3" Padding="10,2" FontSize="11" Cursor="Hand" Foreground="{DynamicResource AccentColor}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" Background="#20FFD700" Height="24" Click="BtnSuggestion_Click"/>
+                                            <Button Content="{Binding}" Margin="0,0,4,3" Padding="10,2" FontSize="11" Cursor="Hand" Foreground="{DynamicResource AccentColor}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" Background="{DynamicResource GoldTint12}" Height="24" Click="BtnSuggestion_Click"/>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -311,7 +386,7 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Button Content="{Binding}" Margin="0,0,4,3" Padding="10,2" FontSize="11" Cursor="Hand" Foreground="{DynamicResource AccentColor}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" Background="#20FFD700" Height="24" Click="BtnAddSuggestion_Click"/>
+                                            <Button Content="{Binding}" Margin="0,0,4,3" Padding="10,2" FontSize="11" Cursor="Hand" Foreground="{DynamicResource AccentColor}" BorderBrush="{DynamicResource AccentColor}" BorderThickness="1" Background="{DynamicResource GoldTint12}" Height="24" Click="BtnAddSuggestion_Click"/>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -581,12 +656,12 @@
                                                                 <Setter Property="BorderThickness" Value="1"/>
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Safety}" Value="Caution">
-                                                                <Setter Property="Background" Value="#20FFD700"/>
+                                                                <Setter Property="Background" Value="{DynamicResource GoldTint12}"/>
                                                                 <Setter Property="BorderBrush" Value="#FFD700"/>
                                                                 <Setter Property="BorderThickness" Value="1"/>
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Safety}" Value="Unknown">
-                                                                <Setter Property="Background" Value="#20FFD700"/>
+                                                                <Setter Property="Background" Value="{DynamicResource GoldTint12}"/>
                                                                 <Setter Property="BorderBrush" Value="#FFD700"/>
                                                                 <Setter Property="BorderThickness" Value="1"/>
                                                             </DataTrigger>

@@ -34,6 +34,7 @@ namespace KitLugia.GUI.Helpers
         private const uint SHGFI_LARGEICON = 0x0;
         private const uint SHGFI_SMALLICON = 0x1;
         private const uint SHGFI_USEFILEATTRIBUTES = 0x10;
+        private const uint SHGFI_SYSICONINDEX = 0x4000;   // devolve o índice na lista de imagens do sistema
 
         // ───────── FIX HARD ERROR BOX ("Exception Processing Message 0xC0000005") ─────────
         // Quando SHGetFileInfo/LoadLibrary tenta ler ícone de arquivo em drive de rede
@@ -78,7 +79,10 @@ namespace KitLugia.GUI.Helpers
         {
             long mtime = 0;
             try { if (File.Exists(filePath)) mtime = File.GetLastWriteTimeUtc(filePath).Ticks; } catch { }
-            return Path.Combine(IconCacheDir, StableHash($"{filePath}|{index ?? -1}|{mtime}") + ".png");
+            // V2 = ícone extraído em 256px (jumbo). Muda o prefixo para os PNGs gravados pelo
+            // modo antigo (32px, borrados) serem ignorados — senão o cache em disco serviria
+            // para sempre o ícone pequeno que já estava lá.
+            return Path.Combine(IconCacheDir, $"v3_{StableHash($"{filePath}|{index ?? -1}|{mtime}")}.png");
         }
 
         private static string StableHash(string s)
@@ -98,7 +102,7 @@ namespace KitLugia.GUI.Helpers
                 bmp.BeginInit();
                 bmp.CacheOption = BitmapCacheOption.OnLoad;
                 bmp.UriSource = new Uri(p);
-                bmp.DecodePixelWidth = 48;
+                bmp.DecodePixelWidth = IconDecodeSize;   // 64: nítido em DPI 200% sem inflar memória
                 bmp.EndInit();
                 bmp.Freeze();
                 return bmp;
@@ -276,6 +280,11 @@ namespace KitLugia.GUI.Helpers
                 if (cleanPath.EndsWith(".ico", StringComparison.OrdinalIgnoreCase) && File.Exists(cleanPath))
                     result = LoadIcoFile(cleanPath);
 
+                // PNG/JPG direto: logos de pacotes UWP e assets de app. SHGetFileInfo nesses
+                // arquivos devolve o ícone genérico de "imagem", então decodificamos o arquivo.
+                if (result == null && IsRasterImage(cleanPath) && File.Exists(cleanPath))
+                    result = LoadRasterImage(cleanPath);
+
                 // FIX HARD ERROR 0xC0000005: caminhos de rede/UNC/drive ausentes fazem o
                 // loader do Windows disparar "Exception Processing Message" (hard error box).
                 // Nunca passar esses caminhos para SHGetFileInfo/ExtractAssociatedIcon:
@@ -284,6 +293,21 @@ namespace KitLugia.GUI.Helpers
                     cleanPath.StartsWith(@"\\", StringComparison.Ordinal) ||                 // UNC
                     cleanPath.StartsWith("http", StringComparison.OrdinalIgnoreCase) ||       // URL
                     (!File.Exists(cleanPath) && !cleanPath.Contains(':'));                     // sem drive
+
+                // Ícone em ALTA resolução: o shell expõe a lista jumbo (256x256) do Vista em
+                // diante. SHGetFileInfo com SHGFI_ICON|SHGFI_LARGEICON devolve 32x32 — daí os
+                // ícones borrados/errados na tela. SYSICONINDEX + SHIL_JUMBO é o caminho
+                // documentado para se obter o ícone grande que o Explorer usa.
+                if (result == null && File.Exists(cleanPath) && !isUnsafePath)
+                    result = TryJumboIcon(cleanPath);
+
+                // Fallback de alta resolução para arquivos que o shell não indexa
+                // (exe solto, dll com ícone, .ico multi-frame): pede 256x256 direto ao
+                // extrator de recursos.
+                if (result == null && File.Exists(cleanPath) && !isUnsafePath &&
+                    (cleanPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+                     cleanPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)))
+                    result = TryPrivateExtractIcon(cleanPath, iconIndex);
 
                 // SHGetFileInfo (só com arquivo local existente; senão, modo atributos-only)
                 if (result == null && !isUnsafePath)
@@ -323,7 +347,7 @@ namespace KitLugia.GUI.Helpers
                         if (handle != IntPtr.Zero)
                         {
                             using (var icon = System.Drawing.Icon.FromHandle(handle))
-                                result = IconToBitmapSource(icon);
+                            result = IconToBitmapSource(icon);
                         }
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
@@ -338,6 +362,11 @@ namespace KitLugia.GUI.Helpers
                 }
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+            // Corte da margem transparente: o shell entrega alguns ícones desenhados dentro de um
+            // canvas grande e vazio (ex.: cute-borders, wscript), e na coluna de 34px o desenho
+            // ficava com 5px. Recortar na tinta deixa o glifo preencher o espaço.
+            result = CortarMargemTransparente(result);
 
             lock (CacheLock)
             {
@@ -361,7 +390,6 @@ namespace KitLugia.GUI.Helpers
                 }
             }
 
-            // Grava no disco só quando o arquivo realmente existe (não caceta genéricos de extensão)
             if (result != null && File.Exists(cleanPath))
                 SaveIconToDisk(cleanPath, iconIndex, result);
             return result;
@@ -431,6 +459,177 @@ namespace KitLugia.GUI.Helpers
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool DestroyIcon(IntPtr hIcon);
 
+        #region Corte da margem transparente
+
+        /// <summary>
+        /// Recorta o padding transparente do ícone.
+        ///
+        /// Motivo: o shell (lista jumbo) e alguns .ico de terceiros entregam o desenho dentro de um
+        /// canvas grande e vazio — o cute-borders e o wscript.exe ocupavam 19% do quadrado, então na
+        /// coluna de 34px o glifo saía com ~6px ao lado de Discord/Steam que preenchem tudo. Como a
+        /// Image usa Stretch=Uniform, recortar equivale a ampliar o desenho até preencher o espaço.
+        ///</n>
+        /// Só age quando a tinta ocupa menos de 88% do lado (ícones já cheios não são tocados) e
+        /// mantém 6% de respiro, para não colar o glifo na borda.
+        /// </summary>
+        private static BitmapSource? CortarMargemTransparente(BitmapSource? icone)
+        {
+            if (icone == null) return null;
+
+            try
+            {
+                int w = icone.PixelWidth, h = icone.PixelHeight;
+                if (w < 8 || h < 8) return icone;
+
+                var px = new byte[w * h * 4];
+                new System.Windows.Media.Imaging.FormatConvertedBitmap(
+                    icone, PixelFormats.Bgra32, null, 0).CopyPixels(px, w * 4, 0);
+
+                int x0 = w, y0 = h, x1 = -1, y1 = -1;
+                for (int y = 0; y < h; y++)
+                {
+                    int baseLinha = y * w * 4;
+                    for (int x = 0; x < w; x++)
+                    {
+                        if (px[baseLinha + x * 4 + 3] <= 20) continue;
+                        if (x < x0) x0 = x;
+                        if (y < y0) y0 = y;
+                        if (x > x1) x1 = x;
+                        if (y > y1) y1 = y;
+                    }
+                }
+
+                if (x1 < 0) return icone;                       // totalmente transparente
+
+                int largura = x1 - x0 + 1, altura = y1 - y0 + 1;
+                if (largura >= w * 0.88 && altura >= h * 0.88) return icone;   // já preenche
+
+                // Respiro de 6% do lado maior, sem passar do canvas original.
+                int folga = (int)Math.Round(Math.Max(largura, altura) * 0.06);
+                x0 = Math.Max(0, x0 - folga);
+                y0 = Math.Max(0, y0 - folga);
+                x1 = Math.Min(w - 1, x1 + folga);
+                y1 = Math.Min(h - 1, y1 + folga);
+
+                var recorte = new System.Windows.Media.Imaging.CroppedBitmap(
+                    icone, new Int32Rect(x0, y0, x1 - x0 + 1, y1 - y0 + 1));
+                recorte.Freeze();
+                return recorte;
+            }
+            catch
+            {
+                return icone;   // qualquer falha: mantém o ícone original
+            }
+        }
+
+        #endregion
+
+        #region Ícone em alta resolução (jumbo 256px do shell + PrivateExtractIcons)
+
+        private const int SHIL_JUMBO = 0x4;
+        private const uint ILD_TRANSPARENT = 0x1;
+
+        [DllImport("shell32.dll")]
+        private static extern int SHGetImageList(int iImageList, ref Guid riid, out IntPtr ppv);
+
+        [DllImport("comctl32.dll")]
+        private static extern IntPtr ImageList_GetIcon(IntPtr himl, int i, uint flags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern uint PrivateExtractIcons(string szFileName, int nIconIndex,
+            int cxIcon, int cyIcon, IntPtr[]? phicon, uint[]? piconid, uint nIcons, uint flags);
+
+        /// <summary>
+        /// Tamanho em que os ícones são decodificados. O DataGrid mostra 26px e as listas 32px;
+        /// decodificar em 64 dá margem para DPI 200% sem inflar memória (256px por ícone ×
+        /// 1100 apps passaria de 250 MB).
+        /// </summary>
+        private const int IconDecodeSize = 64;
+
+        /// <summary>
+        /// Ícone 256x256 do shell: SHGetFileInfo com SHGFI_SYSICONINDEX dá o índice do ícone na
+        /// lista de imagens do sistema, e SHGetImageList(SHIL_JUMBO) devolve essa lista em 256px.
+        /// É o caminho recomendado pela documentação para não ficar preso no 32x32 do
+        /// SHGFI_ICON (fonte dos ícones borrados). Reduzimos para IconDecodeSize antes de devolver.
+        /// </summary>
+        private static BitmapSource? TryJumboIcon(string path)
+        {
+            IntPtr himl = IntPtr.Zero;
+            try
+            {
+                var sfi = new SHFILEINFO();
+                IntPtr ok = SHGetFileInfo(path, 0, ref sfi, (uint)Marshal.SizeOf(sfi),
+                    SHGFI_SYSICONINDEX);
+                if (ok == IntPtr.Zero || sfi.iIcon == 0) return null;
+
+                var iid = new Guid("46EB5926-582E-4017-9FDF-E8998DAA0950"); // IID_IImageList
+                int hrLista = SHGetImageList(SHIL_JUMBO, ref iid, out himl);
+                if (hrLista != 0 || himl == IntPtr.Zero) return null;
+
+                IntPtr hIcon = ImageList_GetIcon(himl, sfi.iIcon, ILD_TRANSPARENT);
+                if (hIcon == IntPtr.Zero) return null;
+
+                try { return FromHIcon(hIcon); }
+                finally { DestroyIcon(hIcon); }
+            }
+            catch { return null; }
+            finally
+            {
+                // A lista é compartilhada pelo shell: só soltamos a referência, sem destruir.
+                if (himl != IntPtr.Zero) { try { Marshal.Release(himl); } catch { } }
+            }
+        }
+
+        /// <summary>
+        /// Pede o ícone em 256x256 direto ao extrator de recursos (funciona para exe/dll/ico).
+        /// Usado quando a lista jumbo não tem o arquivo indexado.
+        /// </summary>
+        private static BitmapSource? TryPrivateExtractIcon(string path, int index)
+        {
+            try
+            {
+                var hicons = new IntPtr[1];
+                uint extraidos = PrivateExtractIcons(path, index, 256, 256, hicons, null, 1, 0);
+                if (extraidos == 0 || hicons[0] == IntPtr.Zero) return null;
+
+                try { return FromHIcon(hicons[0]); }
+                finally { DestroyIcon(hicons[0]); }
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// HICON -&gt; BitmapSource preservando alfa (CreateBitmapSourceFromHIcon), reduzido para
+        /// IconDecodeSize. Evita o ToBitmap() do System.Drawing, que perdia transparência.
+        /// </summary>
+        private static BitmapSource? FromHIcon(IntPtr hIcon)
+        {
+            try
+            {
+                var bmp = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(
+                    hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+
+                // Recorta ANTES de reduzir: em 256px o glifo tem resolução de sobra, então o corte
+                // preserva detalhe. Se deixássemos para depois do downscale, um glifo de 48px no
+                // canvas de 256 viraria 12px e aí sim ficaria borrado ao ser ampliado na tela.
+                bmp = CortarMargemTransparente(bmp) ?? bmp;
+
+                if (bmp.PixelWidth > IconDecodeSize)
+                {
+                    double escala = (double)IconDecodeSize / bmp.PixelWidth;
+                    var reduzido = new TransformedBitmap(bmp, new ScaleTransform(escala, escala));
+                    reduzido.Freeze();
+                    return reduzido;
+                }
+
+                bmp.Freeze();
+                return bmp;
+            }
+            catch { return null; }
+        }
+
+        #endregion
+
         private static BitmapSource? LoadIcoFile(string icoPath)
         {
             try
@@ -446,8 +645,37 @@ namespace KitLugia.GUI.Helpers
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); return null; }
         }
 
-        private static BitmapSource? IconToBitmapSource(System.Drawing.Icon icon)
+        /// <summary>
+        /// Extensões de imagem que decodificamos direto (logos de pacote UWP, assets de app).
+        /// </summary>
+        private static bool IsRasterImage(string? path) =>
+            !string.IsNullOrEmpty(path) &&
+            (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// Decodifica um PNG/JPG como ícone, reduzindo na decodificação (DecodePixelWidth 64) —
+        /// sem isso um Square44x44Logo.scale-400 (176x176) viraria bitmap grande em memória.
+        /// </summary>
+        private static BitmapSource? LoadRasterImage(string path)
         {
+            try
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                bitmap.UriSource = new Uri(path);
+                bitmap.DecodePixelWidth = 64;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                return bitmap;
+            }
+            catch { Logger.LogWarning("ProgramIconHelper", "Falha ao decodificar imagem de ícone"); return null; }
+        }
+
+        private static BitmapSource? IconToBitmapSource(System.Drawing.Icon icon)        {
             try
             {
                 using (var bitmap = icon.ToBitmap())

@@ -18,6 +18,8 @@
     <SolidColorBrush x:Key="CardBackground" Color="#15FFFFFF"/>
     <SolidColorBrush x:Key="CardHover" Color="#25FFFFFF"/>
     <SolidColorBrush x:Key="CardBorder" Color="#33FFD700"/>
+    <!-- Dourado translúcido por cima de surface: usado em 4 páginas para fundo de pill/realce -->
+    <SolidColorBrush x:Key="GoldTint12" Color="#20FFD700"/>
 
     <!-- Superficies (docs/UI_CONSISTENCY_PLAN.md): Surface0 fundo, Surface1 card, Surface2 realce -->
     <SolidColorBrush x:Key="Surface0" Color="#0F0F0F"/>

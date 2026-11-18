@@ -45,6 +45,456 @@ namespace KitLugia.Core
             return string.IsNullOrEmpty(args) ? $"\"{rawPath}\"" : $"\"{rawPath}\" {args}";
         }
 
+        #region StartupApproved (estado real ligado/desligado — igual ao Gerenciador de Tarefas)
+
+        // PORTADO DO optimizerDuck (Services/UI/StartupManagerService.cs):
+        // O Windows NÃO remove o valor do Run ao desabilitar um item — ele grava um flag binário em
+        // Explorer\StartupApproved. Sem ler esse flag direito a lista mostrava como ATIVADO tudo que
+        // o usuário tinha desligado pelo Gerenciador de Tarefas/Configurações.
+        //   bytes[0] == 02 ou 06 -> habilitado
+        //   bytes[0] == 03 ou 07 -> desabilitado
+        //   bytes[4..12]         -> FILETIME da alteração (a data que o Gerenciador de Tarefas mostra)
+
+        /// <summary>Interpreta o blob binário de StartupApproved (estado + data da alteração).</summary>
+        private static void ParseApprovedData(byte[]? data, out bool isEnabled, out DateTime? changedUtc)
+        {
+            isEnabled = true;
+            changedUtc = null;
+            if (data == null || data.Length < 4) return;
+
+            isEnabled = data[0] != 0x03 && data[0] != 0x07;
+
+            if (data.Length >= 12)
+            {
+                try
+                {
+                    long fileTime = BitConverter.ToInt64(data, 4);
+                    if (fileTime > 0 && fileTime <= DateTime.MaxValue.ToFileTimeUtc())
+                        changedUtc = DateTime.FromFileTimeUtc(fileTime).ToLocalTime();
+                }
+                catch { /* carimbo inválido: só o estado importa */ }
+            }
+        }
+
+        /// <summary>
+        /// Monta os 12 bytes que o Gerenciador de Tarefas grava: flag (02 ligado / 03 desligado) +
+        /// FILETIME da alteração. O código antigo gravava zeros nos 8 últimos bytes, e aí o
+        /// Gerenciador de Tarefas mostrava o item sem data de desativação.
+        /// </summary>
+        private static byte[] BuildApprovedData(bool enable)
+        {
+            var data = new byte[12];
+            data[0] = enable ? (byte)0x02 : (byte)0x03;
+            try { BitConverter.GetBytes(DateTime.UtcNow.ToFileTimeUtc()).CopyTo(data, 4); }
+            catch { /* sem carimbo, só o flag */ }
+            return data;
+        }
+
+        /// <summary>
+        /// Subchave de StartupApproved correspondente à chave Run lida.
+        /// Run/RunServices usam o blob de Run; RunOnce/RunServicesOnce o de RunOnce; e as entradas
+        /// de 32 bits (WOW6432Node) têm subchave PRÓPRIA (Run32/RunOnce32) — o código antigo mandava
+        /// toda entrada WOW6432Node para Run32, inclusive as de RunOnce.
+        /// </summary>
+        private static string ApprovedSubKeyLeaf(string runKeyPath, bool is32Bit, bool isRunOnce)
+        {
+            if (is32Bit) return isRunOnce ? "RunOnce32" : "Run32";
+            return isRunOnce ? "RunOnce" : "Run";
+        }
+
+        private const string StartupApprovedRoot = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved";
+
+        #endregion
+
+        #region Resolução de caminho e metadados (portado do optimizerDuck)
+
+        /// <summary>
+        /// Resolve o executável de um comando de inicialização: expande variáveis de ambiente, corta
+        /// no primeiro ".exe" (descarta argumentos) e, quando o comando é só um nome, procura no PATH.
+        /// Retorna null quando o arquivo não existe — quem chama não deve inventar caminho.
+        /// </summary>
+        public static string? ResolveExecutablePath(string? command)
+        {
+            if (string.IsNullOrWhiteSpace(command)) return null;
+
+            try
+            {
+                string path = Environment.ExpandEnvironmentVariables(command.Trim().Trim('"', '\'', ' '));
+
+                // Itens UWP/MSIX e comandos de shell (rundll32, cmd /c ...) não têm arquivo próprio
+                if (path.StartsWith("StartupTask:", StringComparison.OrdinalIgnoreCase)) return null;
+
+                int exeIdx = path.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+                if (exeIdx > 0)
+                    path = path.Substring(0, exeIdx + 4).Trim('"', '\'', ' ');
+
+                if (File.Exists(path)) return path;
+
+                if (!path.Contains('\\') && !path.Contains('/'))
+                {
+                    string? fromPath = GetFullPathFromEnvironment(path);
+                    if (fromPath != null && File.Exists(fromPath)) return fromPath;
+                }
+            }
+            catch { Logger.LogWarning("StartupManager", "Falha ao resolver caminho do comando de inicialização"); }
+
+            return null;
+        }
+
+        /// <summary>Procura um nome de arquivo simples ("notepad.exe") nas pastas do PATH.</summary>
+        public static string? GetFullPathFromEnvironment(string fileName)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(fileName)) return null;
+                if (File.Exists(fileName)) return Path.GetFullPath(fileName);
+
+                string? values = Environment.GetEnvironmentVariable("PATH");
+                if (string.IsNullOrEmpty(values)) return null;
+
+                foreach (var dir in values.Split(Path.PathSeparator))
+                {
+                    if (string.IsNullOrWhiteSpace(dir)) continue;
+                    try
+                    {
+                        string candidate = Path.Combine(dir.Trim(), fileName);
+                        if (File.Exists(candidate)) return candidate;
+                    }
+                    catch { /* pasta inválida no PATH */ }
+                }
+            }
+            catch { Logger.LogWarning("StartupManager", "Falha ao ler PATH"); }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Preenche Publisher (empresa do binário), FilePath (caminho resolvido) e IconFilePath
+        /// (melhor arquivo para o ícone). Roda em paralelo — é leitura de FileVersionInfo em disco,
+        /// dezenas de ms por item — e só na varredura COMPLETA (a "fast" serve a primeira pintura
+        /// da tela e não toca em disco).
+        /// </summary>
+        private static void EnrichMetadata(List<StartupAppDetails> apps)
+        {
+            if (apps.Count == 0) return;
+
+            try
+            {
+                Parallel.ForEach(apps,
+                    new ParallelOptions { MaxDegreeOfParallelism = Math.Max(2, Environment.ProcessorCount) },
+                    app =>
+                    {
+                        try
+                        {
+                            string? path = ResolveExecutablePath(app.FullCommand);
+                            if (path != null)
+                            {
+                                app.FilePath = path;
+
+                                var fvi = FileVersionInfo.GetVersionInfo(path);
+                                string? publisher = !string.IsNullOrWhiteSpace(fvi.CompanyName)
+                                    ? fvi.CompanyName
+                                    : fvi.FileDescription;
+                                if (!string.IsNullOrWhiteSpace(publisher))
+                                    app.Publisher = publisher.Trim();
+                            }
+
+                            // Ícone do item. O binário do comando nem sempre é o "exe de verdade":
+                            // launchers (Update.exe do Discord, bootstrap, launcher) costumam não ter
+                            // ícone e o app está na pasta ao lado. Por isso a busca na pasta roda
+                            // SEMPRE — o que já veio pronto (logo de pacote UWP) é respeitado.
+                            if (string.IsNullOrWhiteSpace(app.IconFilePath))
+                            {
+                                string? pasta = (path != null ? Path.GetDirectoryName(path) : null)
+                                                ?? FolderFromCommand(app.FullCommand);
+
+                                string? candidata = null;
+                                bool nomeBate = false;
+                                if (!string.IsNullOrWhiteSpace(pasta))
+                                    candidata = FindBestIconFile(pasta, app.Name, out nomeBate);
+
+                                app.IconFilePath = path != null
+                                    ? (nomeBate && candidata != null && !EhBinarioDoSistema(path) &&
+                                       !candidata.Equals(path, StringComparison.OrdinalIgnoreCase)
+                                        ? candidata   // achou o app pelo nome na pasta: ícone melhor
+                                        : path)       // nada melhor: o próprio binário
+                                    : (candidata ?? "");
+                            }
+                        }
+                        catch { /* binário sem metadados / acesso negado */ }
+                    });
+            }
+            catch { Logger.LogWarning("StartupManager", "Falha ao enriquecer metadados da inicialização"); }
+        }
+
+        /// <summary>
+        /// Pasta onde o comando de inicialização aponta (o executável pode nem existir mais — o
+        /// caminho cru ainda diz onde o app morava).
+        /// </summary>
+        private static string? FolderFromCommand(string? command)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(command)) return null;
+                string raw = Environment.ExpandEnvironmentVariables(command.Trim().Trim('"', '\'', ' '));
+
+                int exeIdx = raw.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+                if (exeIdx > 0) raw = raw.Substring(0, exeIdx + 4).Trim('"', '\'', ' ');
+
+                string? dir = Path.GetDirectoryName(raw);
+                return !string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir) ? dir : null;
+            }
+            catch { Logger.LogWarning("StartupManager", "Falha ao achar pasta do comando"); }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Encontra o arquivo com MELHOR chance de ter um ícone de verdade na pasta do app:
+        /// procura na raiz + uma camada das subpastas comuns (bin, app, x64...), sem recursão
+        /// infinita, e pontua as candidatas: .ico com nome do app &gt; .exe com nome do app &gt; .exe
+        /// com nome da pasta &gt; qualquer .ico/.exe não-lixo (uninstall/setup/update são ignorados).
+        /// Sem candidata decente retorna null — aí o chamador usa o ícone genérico mesmo.
+        /// </summary>
+        public static string? FindBestIconFile(string? folder, string? appName)
+            => FindBestIconFile(folder, appName, out _);
+
+        /// <summary>
+        /// Encontra o arquivo com MELHOR chance de ter o ícone do app. Olha não só a pasta exata
+        /// onde o comando aponta, mas também as vizinhas e a pasta de cima — instalação de app com
+        /// launcher fica assim: Discord\Update.exe é o item de inicialização e
+        /// Discord\app-1.0.9\Discord.exe é o app de verdade, com o ícone.
+        ///
+        /// Pontuação: nome igual ao do app &gt; começa com o nome do app &gt; nome igual ao da pasta
+        /// &gt; qualquer .ico &gt; qualquer .exe. Cada nível de distância da pasta do item tira
+        /// pontos, então um vizinho não passa por cima de um acerto na própria pasta. Lixo conhecido
+        /// (uninstall/setup/update/redist/crash) é ignorado: esses nunca têm o ícone do app.
+        /// </summary>
+        public static string? FindBestIconFile(string? folder, string? appName, out bool nomeBate)
+        {
+            nomeBate = false;
+            if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return null;
+
+            string alvo = NomeLimpo(appName);
+            string tokenAlvo = PrimeiroToken(alvo);
+            string nomePasta = Path.GetFileName(
+                folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) ?? "";
+
+            var opts = new System.IO.EnumerationOptions
+            {
+                IgnoreInaccessible = true,
+                RecurseSubdirectories = false,
+                AttributesToSkip = FileAttributes.ReparsePoint,
+            };
+
+            string? melhor = null;
+            int melhorPontos = 0;
+
+            foreach (var (dir, distancia) in PastasCandidatas(folder, opts))
+            {
+                string[] arquivos;
+                try { arquivos = Directory.GetFiles(dir, "*", opts); }
+                catch { continue; }
+
+                foreach (var f in arquivos)
+                {
+                    try
+                    {
+                        string ext = Path.GetExtension(f);
+                        bool ehIco = ext.Equals(".ico", StringComparison.OrdinalIgnoreCase);
+                        bool ehExe = ext.Equals(".exe", StringComparison.OrdinalIgnoreCase);
+                        bool ehDll = ext.Equals(".dll", StringComparison.OrdinalIgnoreCase);
+                        if (!ehIco && !ehExe && !ehDll) continue;
+
+                        string nome = Path.GetFileNameWithoutExtension(f) ?? "";
+                        if (NomeDeLixo(nome)) continue;
+
+                        int pontos = ehIco ? 40 : ehExe ? 34 : 20;
+                        bool bateu = false;
+
+                        if (alvo.Length > 0 && nome.Equals(alvo, StringComparison.OrdinalIgnoreCase))
+                        { pontos += 70; bateu = true; }
+                        else if (alvo.Length > 0 && nome.StartsWith(alvo, StringComparison.OrdinalIgnoreCase))
+                        { pontos += 45; bateu = true; }
+                        else if (nomePasta.Length > 0 && nome.Equals(nomePasta, StringComparison.OrdinalIgnoreCase))
+                        { pontos += 40; bateu = true; }
+                        else if (nomePasta.Length > 0 && nome.StartsWith(nomePasta, StringComparison.OrdinalIgnoreCase))
+                        { pontos += 25; bateu = true; }
+                        // Primeira palavra do nome do app é EXATAMENTE o arquivo: cobre
+                        // "Opera GX scheduled Autoupdate" -> opera.exe na pasta de cima.
+                        // Exige igualdade (não prefixo) para não pescar msedgewebview2.exe
+                        // num item "msedge_cleanup", por exemplo.
+                        else if (tokenAlvo.Length >= 3 && nome.Equals(tokenAlvo, StringComparison.OrdinalIgnoreCase))
+                        { pontos += 35; bateu = true; }
+                        else if (ehIco) pontos += 10;
+
+                        // DLL nunca manda trocar o ícone de um exe que já existe (ícone de DLL
+                        // vira o genérico do Windows), mas continua valendo quando não há exe.
+                        if (ehDll) bateu = false;
+
+                        // Longe do item custa caro: só ganha se o nome bater de verdade.
+                        pontos -= distancia * 6;
+
+                        if (pontos > melhorPontos)
+                        {
+                            melhorPontos = pontos;
+                            melhor = f;
+                            nomeBate = bateu;
+                        }
+                    }
+                    catch { /* arquivo inacessível */ }
+                }
+            }
+
+            return melhorPontos >= 30 ? melhor : null;
+        }
+
+        /// <summary>
+        /// Binário do próprio Windows (System32/SysWOW64/Windows): nesses não vale trocar o ícone
+        /// por um vizinho de nome parecido — o exe do item já tem o ícone certo.
+        /// </summary>
+        private static bool EhBinarioDoSistema(string path)
+        {
+            try
+            {
+                string win = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                return !string.IsNullOrWhiteSpace(win) &&
+                       path.StartsWith(win.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
+                                       StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Pastas visitadas na busca de ícone, com a distância até a pasta do item:
+        /// 0 = a própria pasta, 1 = subpastas (app-1.0.x, current, bin...), 2 = pasta de cima,
+        /// 3 = subpastas da pasta de cima. Os limites evitam varredura grande em pasta compartilhada.
+        /// </summary>
+        private static IEnumerable<(string Dir, int Distancia)> PastasCandidatas(
+            string folder, System.IO.EnumerationOptions opts)
+        {
+            var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { folder };
+            yield return (folder, 0);
+
+            string[] subs;
+            try { subs = Directory.GetDirectories(folder, "*", opts); }
+            catch { subs = Array.Empty<string>(); }
+
+            int limite = 0;
+            foreach (var sub in subs)
+            {
+                if (++limite > 80) break;
+                if (vistos.Add(sub)) yield return (sub, 1);
+            }
+
+            string? pai;
+            try
+            {
+                pai = Path.GetDirectoryName(
+                    folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            }
+            catch { pai = null; }
+
+            if (pai == null || !Directory.Exists(pai) || RaizConhecida(pai)) yield break;
+
+            if (vistos.Add(pai)) yield return (pai, 2);
+
+            try { subs = Directory.GetDirectories(pai, "*", opts); }
+            catch { subs = Array.Empty<string>(); }
+
+            limite = 0;
+            foreach (var sub in subs)
+            {
+                if (++limite > 60) break;
+                if (vistos.Add(sub)) yield return (sub, 3);
+            }
+        }
+
+        /// <summary>
+        /// Pastas genéricas demais para se confiar num ícone achado dentro: procurar em
+        /// Program Files ou na raiz do perfil pegaria o ícone de outro app.
+        /// </summary>
+        private static bool RaizConhecida(string pasta)
+        {
+            try
+            {
+                string p = Path.GetFullPath(pasta).TrimEnd(Path.DirectorySeparatorChar);
+                string[] raizes =
+                {
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                    Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                    Environment.GetFolderPath(Environment.SpecialFolder.System),
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu),
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                };
+
+                foreach (var r in raizes)
+                {
+                    if (string.IsNullOrWhiteSpace(r)) continue;
+                    if (p.Equals(r.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+
+                return p.Length <= 3 && p.EndsWith(':');   // raiz de drive (C:)
+            }
+            catch { return true; }
+        }
+
+        /// <summary>Nome do app sem os sufixos do KitLugia e sem extensão, para comparar com arquivos.</summary>
+        private static string NomeLimpo(string? nome)
+        {
+            if (string.IsNullOrWhiteSpace(nome)) return "";
+            string s = nome.Replace(" [Desabilitado]", "", StringComparison.OrdinalIgnoreCase).Trim();
+            if (s.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) s = s[..^4];
+            return s.Trim();
+        }
+
+        /// <summary>
+        /// Primeira palavra "de verdade" do nome do app (ignora conectivos e palavras genéricas:
+        /// "Opera GX scheduled Autoupdate" -> "Opera"; "Microsoft OneDrive" -> "Microsoft").
+        /// </summary>
+        private static string PrimeiroToken(string nome)
+        {
+            if (string.IsNullOrWhiteSpace(nome)) return "";
+
+            string[] ignorar = { "the", "app", "apps", "service", "services", "update", "updater",
+                                "autoupdate", "launcher", "bootstrap", "helper", "agent", "scheduled" };
+
+            foreach (var palavra in nome.Split(new[] { ' ', '-', '_', '.' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (palavra.Length < 3) continue;
+                if (Array.Exists(ignorar, i => i.Equals(palavra, StringComparison.OrdinalIgnoreCase))) continue;
+                return palavra;
+            }
+
+            return "";
+        }
+
+        /// <summary>Arquivos que nunca carregam o ícone do app.</summary>
+        private static bool NomeDeLixo(string nome)
+        {
+            if (nome.StartsWith("unins", StringComparison.OrdinalIgnoreCase)) return true;
+            if (nome.StartsWith("uninstall", StringComparison.OrdinalIgnoreCase)) return true;
+            if (nome.StartsWith("setup", StringComparison.OrdinalIgnoreCase)) return true;
+            if (nome.StartsWith("update", StringComparison.OrdinalIgnoreCase)) return true;
+            if (nome.StartsWith("install", StringComparison.OrdinalIgnoreCase)) return true;
+            if (nome.Contains("install", StringComparison.OrdinalIgnoreCase)) return true;
+            if (nome.Contains("redist", StringComparison.OrdinalIgnoreCase)) return true;
+            if (nome.Contains("crash", StringComparison.OrdinalIgnoreCase)) return true;
+            if (nome.Contains("report", StringComparison.OrdinalIgnoreCase)) return true;
+            if (nome.StartsWith("dx", StringComparison.OrdinalIgnoreCase)) return true;
+            if (nome.Equals("elevate", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        #endregion
+
         private static void InvalidateCache()
         {
             _cachedApps = null;
@@ -155,11 +605,11 @@ namespace KitLugia.Core
                             string inkVariant = Path.ChangeExtension(fileName, ".ink");
                             value = approvedKey?.GetValue(inkVariant) as byte[];
                         }
-                        bool isEnabled = value == null || value.Length < 1 || (value[0] % 2 == 0);
+                        ParseApprovedData(value, out bool isEnabled, out DateTime? changed);
 
                         var status = (exePath != null && elevatedTaskPaths.Contains(exePath)) ? StartupStatus.Elevated : (isEnabled ? StartupStatus.Enabled : StartupStatus.Disabled);
 
-                        apps.Add(key, new StartupAppDetails(name, commandLine, folder, status));
+                        apps.Add(key, new StartupAppDetails(name, commandLine, folder, status) { StateChangeDate = changed });
                     }
                     catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
                 }
@@ -173,8 +623,9 @@ namespace KitLugia.Core
                     using var key = baseKey.OpenSubKey(path);
                     if (key == null) continue;
 
-                    string approvedKeyPath = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\{Path.GetFileName(path)}";
-                    if (locationPrefix.Contains("WOW6432Node")) { approvedKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run32"; }
+                    string approvedKeyPath = $"{StartupApprovedRoot}\\{ApprovedSubKeyLeaf(path,
+                        locationPrefix.Contains("WOW6432Node", StringComparison.OrdinalIgnoreCase),
+                        path.Contains("Once", StringComparison.OrdinalIgnoreCase))}";
                     using var approvedKey = baseKey.OpenSubKey(approvedKeyPath);
 
                     foreach (var valueName in key.GetValueNames())
@@ -186,12 +637,11 @@ namespace KitLugia.Core
                         string keyName = MakeKey(valueName, exePath);
                         if (apps.ContainsKey(keyName)) continue;
 
-                        var value = approvedKey?.GetValue(valueName) as byte[];
-                        bool isEnabled = value == null || value.Length < 1 || (value[0] % 2 == 0);
+                        ParseApprovedData(approvedKey?.GetValue(valueName) as byte[], out bool isEnabled, out DateTime? changed);
 
                         var status = (exePath != null && elevatedTaskPaths.Contains(exePath)) ? StartupStatus.Elevated : (isEnabled ? StartupStatus.Enabled : StartupStatus.Disabled);
 
-                        apps.Add(keyName, new StartupAppDetails(valueName, commandLine, $"{locationPrefix}\\{path}", status));
+                        apps.Add(keyName, new StartupAppDetails(valueName, commandLine, $"{locationPrefix}\\{path}", status) { StateChangeDate = changed });
                     }
                 }
             };
@@ -701,6 +1151,10 @@ namespace KitLugia.Core
                 catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
             }
 
+            // Fabricante + caminho resolvido: só na varredura COMPLETA. A "fast" é a primeira
+            // pintura da tela e não pode pagar uma leitura de FileVersionInfo por item.
+            if (!fast) EnrichMetadata(apps.Values.ToList());
+
             return apps.Values.OrderBy(a => a.Name).ToList();
         }
 
@@ -837,6 +1291,9 @@ namespace KitLugia.Core
             string? resolvedRegHive = null;
             string? resolvedRegPath = null;
             string? resolvedValueName = null;
+            // Entrada do ramo de 32 bits: o StartupApproved dela vive em Run32/RunOnce32, não em
+            // Run/RunOnce — misturar os dois fazia o Gerenciador de Tarefas discordar do KitLugia.
+            bool resolvedIsWow64 = false;
 
             // Detecta pasta de inicialização (exclui AutorunsDisabled)
             if ((loc.Contains("\\Startup") || loc.Contains("\\Start Menu")) && !loc.Contains("AutorunsDisabled"))
@@ -849,6 +1306,7 @@ namespace KitLugia.Core
             {
                 resolvedRegHive = "HKLM";
                 resolvedRegPath = loc.Substring("HKLM\\WOW6432Node\\".Length);
+                resolvedIsWow64 = true;
                 resolvedValueName = appName;
             }
             else if (loc.StartsWith("HKCU") || loc.StartsWith("HKLM"))
@@ -892,6 +1350,7 @@ namespace KitLugia.Core
                             {
                                 resolvedRegHive = "HKLM";
                                 resolvedRegPath = loc.Substring("HKLM\\WOW6432Node\\".Length);
+                                resolvedIsWow64 = true;
                             }
                             else
                             {
@@ -950,8 +1409,17 @@ namespace KitLugia.Core
                 try
                 {
                     RegistryKey baseKey = resolvedRegHive == "HKLM" ? Registry.LocalMachine : Registry.CurrentUser;
-                    string approvedRegPath = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
-                    byte[] valueToSet = enable ? new byte[] { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } : new byte[] { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                    // PORTADO DO optimizerDuck: a subchave depende do tipo de chave lida
+                    // (Run/RunOnce/Run32/RunOnce32). Antes tudo caía em StartupApproved\Run —
+                    // desabilitar um item de RunOnce (ou de WOW6432Node) gravava o flag no blob
+                    // errado e o Windows continuava executando o item.
+                    bool isRunOnceKey = resolvedRegPath != null &&
+                        (resolvedRegPath.Contains("Once", StringComparison.OrdinalIgnoreCase) ||
+                         resolvedIsWow64 && resolvedRegPath.Contains("RunOnce", StringComparison.OrdinalIgnoreCase));
+                    string approvedRegPath = $"{StartupApprovedRoot}\\{ApprovedSubKeyLeaf(resolvedRegPath ?? "Run", resolvedIsWow64, isRunOnceKey)}";
+                    // 12 bytes (flag + FILETIME): é o formato que o Gerenciador de Tarefas entende,
+                    // incluindo a data da alteração mostrada naquela tela.
+                    byte[] valueToSet = BuildApprovedData(enable);
 
                     using (var key = baseKey.OpenSubKey(approvedRegPath, true) ?? baseKey.CreateSubKey(approvedRegPath))
                     {
@@ -1081,8 +1549,9 @@ namespace KitLugia.Core
             {
                 try
                 {
-                    string approvedRegPath = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder";
-                    byte[] valueToSet = enable ? new byte[] { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } : new byte[] { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                    string approvedRegPath = $"{StartupApprovedRoot}\\StartupFolder";
+                    // 12 bytes com FILETIME, igual ao Gerenciador de Tarefas (ver BuildApprovedData).
+                    byte[] valueToSet = BuildApprovedData(enable);
 
                     // Search for the correct entry name in StartupApproved
                     using (var approvedKey = Registry.CurrentUser.OpenSubKey(approvedRegPath, true) ?? Registry.CurrentUser.CreateSubKey(approvedRegPath))
@@ -1831,7 +2300,268 @@ namespace KitLugia.Core
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
+            // --- 6. PACOTES COM StartupTask NO MANIFEST (AppxManifest.xml) ---
+            // PORTADO DO optimizerDuck (Domain/...: ScanUwpStartupTasks): nem todo app da Loja que
+            // inicia com o Windows aparece em Explorer\StartupTasks ou SystemAppData antes de ser
+            // aberto pela primeira vez — o AppxManifest.xml do pacote é a fonte que sobra. O KitLugia
+            // não cobria esses itens; agora lista tudo o que o Gerenciador de Tarefas lista.
+            try
+            {
+                AddUwpStartupTasksFromManifests(apps);
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
             return apps.OrderBy(a => a.Name).ToList();
+        }
+
+        /// <summary>Repertório per-user de pacotes instalados (chave que o PackageManager usa).</summary>
+        private const string PackageRepositoryRoot =
+            @"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages";
+
+        /// <summary>Raiz do estado per-user das tarefas de inicialização de pacotes.</summary>
+        private const string SystemAppDataRoot =
+            @"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData";
+
+        /// <summary>
+        /// Varre o repositório de pacotes do usuário; para cada AppxManifest.xml que declara
+        /// StartupTask, adiciona a entrada com o estado real (SystemAppData State; sem estado,
+        /// o atributo Enabled do manifesto). Itens já conhecidos (mesmo FamilyName!TaskId) são
+        /// ignorados — o item 5 já os listou.
+        /// </summary>
+        private static void AddUwpStartupTasksFromManifests(List<StartupAppDetails> apps)
+        {
+            using var repository = Registry.CurrentUser.OpenSubKey(PackageRepositoryRoot);
+            if (repository == null) return;
+
+            foreach (var packageKeyName in repository.GetSubKeyNames())
+            {
+                try
+                {
+                    using var packageKey = repository.OpenSubKey(packageKeyName);
+                    if (packageKey?.GetValue("PackageRootFolder") is not string installPath) continue;
+
+                    string manifestPath = Path.Combine(installPath, "AppxManifest.xml");
+                    if (!File.Exists(manifestPath)) continue;
+
+                    // Substring antes do XML: a esmagadora maioria dos pacotes não declara
+                    // StartupTask e não vale a pena montar um XDocument para cada um.
+                    string manifestText = File.ReadAllText(manifestPath);
+                    if (!manifestText.Contains("StartupTask", StringComparison.Ordinal)) continue;
+
+                    var manifest = XDocument.Parse(manifestText);
+                    var startupTasks = manifest
+                        .Descendants()
+                        .Where(e => e.Name.LocalName == "StartupTask")
+                        .ToList();
+                    if (startupTasks.Count == 0) continue;
+
+                    string familyName = PackageFamilyName(
+                        packageKey.GetValue("PackageID") as string ?? packageKeyName) ?? "";
+                    if (familyName.Length == 0) continue;
+
+                    // Nome que o shell mostra (resolve ms-resource:... que o manifesto cria).
+                    string? shellName = ResolveShellDisplayName(familyName);
+                    string displayName = !string.IsNullOrWhiteSpace(shellName)
+                        ? shellName!
+                        : ResolvePackageFamilyName(familyName);
+
+                    // Editor do pacote (Identity/Publisher vem como CN=...)
+                    string? publisher = null;
+                    var identityEl = manifest.Descendants().FirstOrDefault(e => e.Name.LocalName == "Identity");
+                    string? publisherRaw = (string?)identityEl?.Attribute("Publisher");
+                    if (!string.IsNullOrWhiteSpace(publisherRaw))
+                    {
+                        publisher = publisherRaw.StartsWith("CN=", StringComparison.OrdinalIgnoreCase)
+                            ? publisherRaw.Substring(3)
+                            : publisherRaw;
+                    }
+
+                    // Executável real do pacote (para o ícone da lista).
+                    string? exePath = null;
+                    try
+                    {
+                        string? exe = (string?)manifest
+                            .Descendants()
+                            .FirstOrDefault(e => e.Name.LocalName == "Application")
+                            ?.Attribute("Executable");
+                        if (!string.IsNullOrWhiteSpace(exe))
+                            exePath = Path.IsPathRooted(exe) ? exe : Path.Combine(installPath, exe);
+                    }
+                    catch { }
+
+                    // Logo do pacote: quando o exe não dá ícone (ou está em WindowsApps, com ACL
+                    // restrita), o PNG declarado no manifesto é o ícone "de verdade" do app.
+                    string? logoPath = ResolveUwpLogoFile(installPath, manifest);
+
+                    foreach (var task in startupTasks)
+                    {
+                        string? taskId = (string?)task.Attribute("TaskId");
+                        if (string.IsNullOrWhiteSpace(taskId)) continue;
+
+                        string token = $"{familyName}!{taskId}";
+
+                        // Já existe um item com este mesmo FamilyName!TaskId (veio da varredura do
+                        // SystemAppData, que não abre o manifesto e por isso não sabe o ícone):
+                        // completa o que falta nele em vez de duplicar a linha.
+                        var existente = apps.FirstOrDefault(a =>
+                            a.FullCommand != null &&
+                            a.FullCommand.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0);
+                        if (existente != null)
+                        {
+                            if (string.IsNullOrWhiteSpace(existente.IconFilePath))
+                                existente.IconFilePath = logoPath
+                                    ?? (exePath != null && File.Exists(exePath) ? exePath : "");
+                            if (string.IsNullOrWhiteSpace(existente.FilePath) && exePath != null && File.Exists(exePath))
+                                existente.FilePath = exePath;
+                            if (string.IsNullOrWhiteSpace(existente.Publisher) && !string.IsNullOrWhiteSpace(publisher))
+                                existente.Publisher = publisher!;
+                            continue;
+                        }
+
+                        // Estado real: SystemAppData State (0=Disabled,1=DisabledByUser,2=Enabled,
+                        // 4=EnabledByPolicy); sem estado ainda, vale o Enabled declarado no manifesto.
+                        bool isEnabled = string.Equals(
+                            (string?)task.Attribute("Enabled"), "true", StringComparison.OrdinalIgnoreCase);
+                        try
+                        {
+                            using var stateKey = Registry.CurrentUser.OpenSubKey($"{SystemAppDataRoot}\\{familyName}\\{taskId}");
+                            if (stateKey?.GetValue("State") is int state)
+                                isEnabled = state is 2 or 4;
+                        }
+                        catch { }
+
+                        string name = displayName;
+                        if (startupTasks.Count > 1) name = $"{name} ({taskId})";
+
+                        apps.Add(new StartupAppDetails(
+                            name,
+                            $"StartupTask: {familyName}!{taskId}",
+                            "UWP (Settings)",
+                            isEnabled ? StartupStatus.Enabled : StartupStatus.Disabled)
+                        {
+                            Publisher = publisher ?? "",
+                            FilePath = exePath != null && File.Exists(exePath) ? exePath : "",
+                            // A logo do manifesto vem primeiro: o exe em WindowsApps costuma dar
+                            // ícone genérico (ou nada) por causa da ACL da pasta.
+                            IconFilePath = logoPath ?? (exePath != null && File.Exists(exePath) ? exePath : "")
+                        });
+                    }
+                }
+                catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+            }
+        }
+
+        /// <summary>
+        /// Acha o PNG de logo de um pacote UWP no disco. O manifesto declara o nome "base"
+        /// (Assets\Square44x44Logo.png), mas o arquivo real na pasta tem qualificador de escala
+        /// (Square44x44Logo.scale-200.png, .targetsize-44_altform-unplated.png...), por isso testa
+        /// os nomes mais comuns em ordem do maior para o menor. Testar arquivo por arquivo também
+        /// contorna a ACL do WindowsApps, que proíbe LISTAR a pasta mas permite ler o arquivo.
+        /// </summary>
+        private static string? ResolveUwpLogoFile(string installPath, XDocument manifest)
+        {
+            try
+            {
+                string? logo =
+                    (string?)manifest.Descendants().FirstOrDefault(e => e.Name.LocalName == "VisualElements")?.Attribute("Square44x44Logo")
+                    ?? (string?)manifest.Descendants().FirstOrDefault(e => e.Name.LocalName == "VisualElements")?.Attribute("Square150x150Logo")
+                    ?? (string?)manifest.Descendants().FirstOrDefault(e => e.Name.LocalName == "Properties")?.Attribute("Logo");
+
+                if (string.IsNullOrWhiteSpace(logo)) return null;
+
+                string rel = logo.Replace('/', '\\');
+                string pasta = Path.Combine(installPath, Path.GetDirectoryName(rel) ?? "");
+                string baseNome = Path.GetFileNameWithoutExtension(rel);
+
+                // Nome base as-is primeiro (pacotes que já embutem o qualificador no manifesto)
+                string direto = Path.Combine(installPath, rel);
+                if (File.Exists(direto)) return direto;
+
+                foreach (var escala in new[] { "scale-400", "scale-200", "scale-150", "scale-125", "scale-100" })
+                {
+                    string c = Path.Combine(pasta, $"{baseNome}.{escala}.png");
+                    if (File.Exists(c)) return c;
+                }
+
+                foreach (var tam in new[] { "targetsize-256", "targetsize-64", "targetsize-48", "targetsize-44", "targetsize-32" })
+                {
+                    string c = Path.Combine(pasta, $"{baseNome}.{tam}.png");
+                    if (File.Exists(c)) return c;
+                }
+            }
+            catch { Logger.LogWarning("StartupManager", "Falha ao achar logo do pacote UWP"); }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Extrai o nome da família de um package full name
+        /// (Name_Version_Arquitetura_ResourceId_PublisherId): nome de pacote não carrega underline,
+        /// então o primeiro segmento + o último formam o family name.
+        /// </summary>
+        internal static string? PackageFamilyName(string packageFullName)
+        {
+            var segments = packageFullName.Split('_');
+            if (segments.Length < 2) return null;
+
+            string name = segments[0];
+            string publisherId = segments[segments.Length - 1];
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(publisherId)) return null;
+
+            return $"{name}_{publisherId}";
+        }
+
+        /// <summary>
+        /// Nome exibido pelo shell para um app da Loja (shell:AppsFolder\FamilyName). Resolve as
+        /// strings ms-resource: que o manifesto deixa — é o nome que o Gerenciador de Tarefas mostra.
+        /// </summary>
+        private static string? ResolveShellDisplayName(string familyName)
+        {
+            try
+            {
+                const uint SIGDN_NORMALDISPLAY = 0;
+                var shellItemId = new Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE");
+
+                if (SHCreateItemFromParsingName($"shell:AppsFolder\\{familyName}", IntPtr.Zero, shellItemId, out var item) != 0 || item == null)
+                    return null;
+
+                try
+                {
+                    item.GetDisplayName(SIGDN_NORMALDISPLAY, out IntPtr namePtr);
+                    if (namePtr == IntPtr.Zero) return null;
+                    try
+                    {
+                        string? name = System.Runtime.InteropServices.Marshal.PtrToStringUni(namePtr);
+                        return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+                    }
+                    finally { System.Runtime.InteropServices.Marshal.FreeCoTaskMem(namePtr); }
+                }
+                finally { System.Runtime.InteropServices.Marshal.ReleaseComObject(item); }
+            }
+            catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
+
+            return null;
+        }
+
+        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, PreserveSig = true)]
+        private static extern int SHCreateItemFromParsingName(
+            string pszPath,
+            IntPtr pbc,
+            in Guid riid,
+            [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Interface)] out IShellItem ppv);
+
+        [System.Runtime.InteropServices.ComImport]
+        [System.Runtime.InteropServices.Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE")]
+        [System.Runtime.InteropServices.InterfaceType(System.Runtime.InteropServices.ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IShellItem
+        {
+            // ORDEM DA VTABLE DO IShellItem (não reordenar!): GetDisplayName é o 3º slot.
+            // Declarar só GetDisplayName faria a chamada cair em BindToHandler e devolver lixo.
+            void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv);
+            void GetParent(out IShellItem ppsi);
+            void GetDisplayName(uint sigdnName, out IntPtr ppszName);
+            void GetAttributes(uint sfgaoMask, out uint psfgaoAttribs);
+            void Compare(IShellItem psi, uint hint, out int piOrder);
         }
 
         private static string ResolveAumidToDisplayName(string aumid)

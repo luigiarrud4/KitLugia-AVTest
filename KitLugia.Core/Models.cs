@@ -61,6 +61,113 @@ namespace KitLugia.Core
         /// <summary>Tooltip da coluna Nome: nome + descrição quando existe.</summary>
         public string DisplayToolTip => string.IsNullOrWhiteSpace(Description) ? Name : $"{Name}\n\n{Description}";
 
+        /// <summary>
+        /// Fabricante/empresa do executável (FileVersionInfo.CompanyName, com FileDescription como
+        /// reserva). Preenchido por StartupManager.EnrichMetadata na varredura completa; vazio quando
+        /// o binário não existe mais no disco ou não tem metadados.
+        /// </summary>
+        public string Publisher { get; set; } = "";
+
+        /// <summary>
+        /// Caminho absoluto do executável RESOLVIDO: variáveis de ambiente expandidas, argumentos
+        /// cortados no .exe e busca no PATH quando o comando é só um nome ("notepad.exe").
+        /// Preenchido por StartupManager.EnrichMetadata. Vazio se não foi possível resolver.
+        /// </summary>
+        public string FilePath { get; set; } = "";
+
+        /// <summary>
+        /// Arquivo de onde tirar o ícone quando o binário do item não serve: procura na MESMA pasta
+        /// um .ico, o .exe com o nome do app, o .exe com o nome da pasta, etc.
+        /// Preenchido por StartupManager.EnrichMetadata (em background) para a tela nunca cair no
+        /// ícone genérico do Windows à toa.
+        /// </summary>
+        public string IconFilePath { get; set; } = "";
+
+        /// <summary>
+        /// FILETIME gravado pelo Windows em StartupApproved: é a data da última alteração de estado
+        /// que o Gerenciador de Tarefas mostra ao lado do item. Null quando o item nunca foi
+        /// ligado/desligado (ou quando o local não guarda esse carimbo).
+        /// </summary>
+        public DateTime? StateChangeDate { get; set; }
+
+        /// <summary>Tooltip do status: data da última alteração, quando conhecida.</summary>
+        public string StatusToolTip => StateChangeDate.HasValue
+            ? $"Última alteração de estado: {StateChangeDate.Value:dd/MM/yyyy HH:mm}"
+            : "";
+
+        /// <summary>
+        /// Rótulo CURTO da origem ("HKCU Run", "HKLM Run (x86)", "Pasta do usuário", ...).
+        /// A coluna Local mostra o caminho completo da chave; este rótulo serve de pill/tooltip e
+        /// evita que o texto da coluna Fabricante fique vazio em itens sem metadados.
+        /// É derivado de <see cref="Location"/>, sem nenhum IO.
+        /// </summary>
+        public string LocationShort
+        {
+            get
+            {
+                string loc = Location ?? "";
+                if (loc.Length == 0) return "";
+
+                if (loc.Contains("Turbo Boot", StringComparison.OrdinalIgnoreCase)) return "KitLugia Boot Tray";
+                if (loc.Contains("Agendador", StringComparison.OrdinalIgnoreCase)) return "Agendador (KitLugia)";
+                if (loc.Contains("AutorunsDisabled", StringComparison.OrdinalIgnoreCase)) return "Pasta (desabilitado)";
+                if (loc.StartsWith("UWP", StringComparison.OrdinalIgnoreCase)) return loc;
+                if (loc.Contains("Winlogon", StringComparison.OrdinalIgnoreCase)) return "Winlogon";
+                if (loc.StartsWith("Startup: ", StringComparison.OrdinalIgnoreCase)) return "WMI";
+                if (loc.StartsWith("HKCU\\Windows\\", StringComparison.OrdinalIgnoreCase)) return loc;
+
+                bool is32 = loc.Contains("WOW6432Node", StringComparison.OrdinalIgnoreCase);
+                bool isMachine = loc.StartsWith("HKLM", StringComparison.OrdinalIgnoreCase);
+                string hive = isMachine ? "HKLM" : "HKCU";
+                string arch = is32 ? " (x86)" : "";
+
+                if (loc.Contains("RunServicesOnce", StringComparison.OrdinalIgnoreCase)) return $"{hive} RunServicesOnce{arch}";
+                if (loc.Contains("RunServices", StringComparison.OrdinalIgnoreCase)) return $"{hive} RunServices{arch}";
+                if (loc.Contains("\\RunOnce", StringComparison.OrdinalIgnoreCase)) return $"{hive} RunOnce{arch}";
+                if (loc.Contains("Policies\\Explorer\\Run", StringComparison.OrdinalIgnoreCase)) return $"{hive} Política{arch}";
+                if (loc.Contains("\\Run", StringComparison.OrdinalIgnoreCase)) return $"{hive} Run{arch}";
+
+                // Pastas de inicialização: compara com as duas pastas reais do sistema
+                try
+                {
+                    if (string.Equals(loc.TrimEnd('\\'), Environment.GetFolderPath(Environment.SpecialFolder.Startup).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                        return "Pasta do usuário";
+                    if (string.Equals(loc.TrimEnd('\\'), Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                        return "Pasta (todos os usuários)";
+                }
+                catch { }
+
+                return loc;
+            }
+        }
+
+        /// <summary>
+        /// Caminho mostrado na lista: o executável RESOLVIDO quando existe (sem aspas, sem
+        /// argumentos); quando não dá para resolver (rundll32, token StartupTask:, arquivo
+        /// apagado), cai no comando original — a célula nunca fica em branco.
+        /// </summary>
+        public string PathDisplay => !string.IsNullOrWhiteSpace(FilePath) ? FilePath : FullCommand;
+
+        /// <summary>
+        /// Tooltip da coluna Caminho: caminho + comando bruto quando forem diferentes (argumentos
+        /// e aspas preservados), já que a célula mostra a versão limpa.
+        /// </summary>
+        public string PathToolTip =>
+            string.IsNullOrWhiteSpace(FilePath) || FilePath.Equals(FullCommand, StringComparison.OrdinalIgnoreCase)
+                ? FullCommand
+                : $"{FilePath}\n\nComando: {FullCommand}";
+
+        /// <summary>
+        /// Argumentos de linha de comando mostrados como pill própria (ex.: "--tray", "--silent").
+        /// O KitLugia cria entradas assim (Boot Tray/Admin) e sem isso dois itens do MESMO exe com
+        /// argumentos diferentes pareciam duplicados. Vazio quando o caminho não foi resolvido —
+        /// nesse caso <see cref="PathDisplay"/> já mostra o comando completo com os argumentos.
+        /// </summary>
+        public string ArgsPill => string.IsNullOrWhiteSpace(FilePath) ? "" : Arguments;
+
+        /// <summary>Tooltip da pill de argumentos (texto completo, sem truncamento na célula).</summary>
+        public string ArgsToolTip => $"Argumentos: {Arguments}";
+
         /// <summary>Hex color for status pill (green for enabled, red for disabled)</summary>
         public string StatusColor => Status switch
         {

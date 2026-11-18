@@ -31,19 +31,16 @@ namespace KitLugia.GUI.Helpers
             BitmapSource? icon = null;
             try
             {
-                // 1) Ícone REAL via shell:AppsFolder (exige AUMID) — resolve ícones vazios
-                if (!string.IsNullOrWhiteSpace(aumid))
-                    icon = GetUwpIconViaShell(aumid, size);
+                // 1) PNG das Assets do pacote (Square44x44Logo / AppListLogo): é o ícone em
+                // ALTÍSSIMA resolução que o manifesto declara. Vem antes do shell porque o shell
+                // às vezes devolve o ícone genérico da Store (sacola azul) e é 44px no melhor caso.
+                string? iconPath = GetUwpIconPathNative(packageName);
+                if (!string.IsNullOrWhiteSpace(iconPath) && File.Exists(iconPath))
+                    icon = LoadImageFromFile(iconPath, Math.Max(size, 64));
 
-                // 2) Fallback: manifesto/registro/Assets
-                if (icon == null)
-                {
-                    string? iconPath = GetUwpIconPathNative(packageName);
-                    if (!string.IsNullOrWhiteSpace(iconPath) && File.Exists(iconPath))
-                    {
-                        icon = LoadImageFromFile(iconPath, size);
-                    }
-                }
+                // 2) Shell: shell:AppsFolder\{AUMID} — o ícone exato que o Windows mostra
+                if (icon == null && !string.IsNullOrWhiteSpace(aumid))
+                    icon = GetUwpIconViaShell(aumid, size);
             }
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
@@ -277,28 +274,35 @@ namespace KitLugia.GUI.Helpers
             return null;
         }
 
+        /// <summary>
+        /// Escolhe o MELHOR asset de logo da pasta do pacote. Os arquivos do pacote têm o nome
+        /// base declarado no manifesto mais um qualificador (ex.: Square44x44Logo.scale-200.png,
+        /// Square44x44Logo.targetsize-256_altform-unplated.png). Ordena pelo tamanho real que o
+        /// qualificador implica e ignora as variantes de contraste (contrast-white), que são
+        /// versões monocromáticas para barra de tarefas.
+        /// </summary>
         private static string? FindBestScaledLogo(string directory, string baseName, string ext)
         {
             string pattern = $"{baseName}*{ext}";
             string? best = null;
-            int bestScale = 0;
+            int bestSize = -1;
 
             try
             {
                 foreach (var file in Directory.GetFiles(directory, pattern, SearchOption.TopDirectoryOnly))
                 {
                     string name = Path.GetFileNameWithoutExtension(file);
-                    int scale = 100;
+                    if (name.Contains(".contrast-", StringComparison.OrdinalIgnoreCase)) continue;
 
-                    var scaleMatch = System.Text.RegularExpressions.Regex.Match(name, @"\.scale-(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    if (scaleMatch.Success)
-                        int.TryParse(scaleMatch.Groups[1].Value, out scale);
+                    int tamanho = TamanhoDoQualificador(name);
 
-                    bool isContrastWhite = name.Contains(".contrast-white", StringComparison.OrdinalIgnoreCase);
+                    // altform-unplated é a variante "sem placa de fundo", a mais parecida com o
+                    // ícone do app; ganha um empurrão para não perder para a versão plated.
+                    if (name.Contains("altform-unplated", StringComparison.OrdinalIgnoreCase)) tamanho += 1;
 
-                    if (scale > bestScale && !isContrastWhite)
+                    if (tamanho > bestSize)
                     {
-                        bestScale = scale;
+                        bestSize = tamanho;
                         best = file;
                     }
                 }
@@ -306,6 +310,28 @@ namespace KitLugia.GUI.Helpers
             catch { Logger.LogWarning("Unknown", "Exception suppressed"); }
 
             return best;
+        }
+
+        /// <summary>
+        /// Traduz o qualificador do nome do asset em um tamanho aproximado em pixels:
+        /// targetsize-256 = 256 px; scale-200 = 2×44 = 88 px (base de 44 do Square44x44Logo).
+        /// Sem qualificador, assume o base (44).
+        /// </summary>
+        private static int TamanhoDoQualificador(string nomeArquivo)
+        {
+            try
+            {
+                var alvo = System.Text.RegularExpressions.Regex.Match(
+                    nomeArquivo, @"targetsize-(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (alvo.Success && int.TryParse(alvo.Groups[1].Value, out int ts)) return ts;
+
+                var escala = System.Text.RegularExpressions.Regex.Match(
+                    nomeArquivo, @"\.scale-(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (escala.Success && int.TryParse(escala.Groups[1].Value, out int sc)) return 44 * sc / 100;
+            }
+            catch { /* nome fora do padrão */ }
+
+            return 44;
         }
 
         private static BitmapSource? LoadImageFromFile(string filePath, int size)
@@ -444,24 +470,30 @@ namespace KitLugia.GUI.Helpers
 
         private static BitmapSource? CreateGenericStoreIcon()
         {
+            // Placeholder neutro para app da Store sem nenhum asset disponível (pacote
+            // "fantasma": registrado mas sem arquivos no disco). Antes era um carrinho de
+            // compras azul, que parecia ícone errado e se repetia em todas as linhas.
+            // Desenhado em 128px e exibido em 32 → nítido em qualquer DPI.
+            const int Lado = 128;
             var drawing = new DrawingVisual();
             using (var ctx = drawing.RenderOpen())
             {
-                ctx.DrawRoundedRectangle(
-                    System.Windows.Media.Brushes.DarkBlue, null,
-                    new System.Windows.Rect(0, 0, 48, 48), 6, 6);
+                var fundo = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2A, 0x2C, 0x31));
+                var traco = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x8A, 0x8F, 0x98));
 
-                var typeface = new Typeface("Segoe UI Emoji");
-                var text = new FormattedText(
-                    "\U0001F6D2",
-                    System.Globalization.CultureInfo.CurrentCulture,
-                    System.Windows.FlowDirection.LeftToRight,
-                    typeface, 28,
-                    System.Windows.Media.Brushes.White, 1.0);
-                ctx.DrawText(text, new System.Windows.Point(10, 10));
+                ctx.DrawRoundedRectangle(fundo, null, new System.Windows.Rect(0, 0, Lado, Lado), 22, 22);
+
+                // Janela de app: retângulo com barra de título e um quadrado interno
+                var caneta = new System.Windows.Media.Pen(traco, 6);
+                var janela = new System.Windows.Rect(28, 34, 72, 60);
+                ctx.DrawRoundedRectangle(null, caneta, janela, 8, 8);
+                ctx.DrawLine(caneta,
+                    new System.Windows.Point(28, 54), new System.Windows.Point(100, 54));
+                ctx.DrawEllipse(traco, null, new System.Windows.Point(40, 44), 2.5, 2.5);
+                ctx.DrawEllipse(traco, null, new System.Windows.Point(50, 44), 2.5, 2.5);
             }
 
-            var bitmap = new RenderTargetBitmap(48, 48, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+            var bitmap = new RenderTargetBitmap(Lado, Lado, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
             bitmap.Render(drawing);
             bitmap.Freeze();
             return bitmap;
